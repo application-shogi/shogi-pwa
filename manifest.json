@@ -1,6 +1,6 @@
 {
-  "name": "将棋PWA - 本格オンライン将棋ゲーム",
-  "short_name": "将棋PWA",
+  "name": "将棋 - 本格オンライン将棋ゲーム",
+  "short_name": "将棋",
   "start_url": "./",
   "display": "standalone",
   "background_color": "#f4f1eb",

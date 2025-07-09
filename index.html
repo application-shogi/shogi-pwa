@@ -556,46 +556,11 @@
             }
         }
         
-        // Service Worker登録（実際のWebサーバーでのみ有効）
-        if ('serviceWorker' in navigator && window.location.protocol === 'https:' && !window.location.hostname.includes('claudeusercontent')) {
-            const swCode = `
-                const CACHE_NAME = 'shogi-pwa-v1';
-                const urlsToCache = [
-                    '/',
-                    '/manifest.json'
-                ];
-                
-                self.addEventListener('install', (event) => {
-                    event.waitUntil(
-                        caches.open(CACHE_NAME)
-                            .then((cache) => {
-                                return cache.addAll(urlsToCache);
-                            })
-                    );
-                });
-                
-                self.addEventListener('fetch', (event) => {
-                    event.respondWith(
-                        caches.match(event.request)
-                            .then((response) => {
-                                if (response) {
-                                    return response;
-                                }
-                                return fetch(event.request);
-                            })
-                    );
-                });
-            `;
-            
-            const blob = new Blob([swCode], { type: 'application/javascript' });
-            const swUrl = URL.createObjectURL(blob);
-            
-            navigator.serviceWorker.register(swUrl)
-                .then(() => console.log('Service Worker registered successfully'))
-                .catch(err => console.log('Service Worker registration failed:', err));
-        } else {
-            console.log('Service Worker not supported in this environment');
-        }
+        // Service Worker登録
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./sw.js')
+        .then(() => console.log('Service Worker registered successfully'))
+        .catch(err => console.log('Service Worker registration failed:', err));
         
         // 盤面初期化
         function initBoard() {

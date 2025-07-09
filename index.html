@@ -1,0 +1,1867 @@
+// 移動後の詰みチェック（打ち歩詰め専用）
+        function isCheckmateAfterMove(player) {
+            // 全ての合法手を試して、王手を回避できるかチェック
+            for (let fromRow = 0; fromRow < 9; fromRow++) {
+                for (let fromCol = 0; fromCol < 9; fromCol++) {
+                    if (gameState.board[fromRow][fromCol] !== '' && 
+                        gameState.pieceOwners[fromRow][fromCol] === player) {
+                        
+                        const piece = gameState.board[fromRow][fromCol];
+                        const owner = gameState.pieceOwners[fromRow][fromCol];
+                        
+                        // この駒の全ての移動先を試す
+                        for (let toRow = 0; toRow < 9; toRow++) {
+                            for (let toCol = 0; toCol < 9; toCol++) {
+                                // 通常の移動
+                                if (isValidMoveForCheckmate(fromRow, fromCol, toRow, toCol, false, player)) {
+                                    if (testMoveForCheckmateWithPlayer(fromRow, fromCol, toRow, toCol, false, player)) {
+                                        return false;
+                                    }
+                                }
+                                
+                                // 成りを伴う移動
+                                if (canPromoteMove(piece, fromRow, toRow, owner) && 
+                                    isValidMoveForCheckmate(fromRow, fromCol, toRow, toCol, true, player)) {
+                                    if (testMoveForCheckmateWithPlayer(fromRow, fromCol, toRow, toCol, true, player)) {
+                                        return false;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // 駒打ちで王手を回避できるかチェック
+            const capturedPieces = gameState.capturedPieces[player];
+            for (let piece of capturedPieces) {
+                for (let row = 0; row < 9; row++) {
+                    for (let col = 0; col < 9; col++) {
+                        if (gameState.board[row][col] === '' && 
+                            canDropPieceForPlayer(piece, row, col, player) && 
+                            !isSuicideDropMoveForPlayer(row, col, piece, player)) {
+                            return false; // 駒打ちで王手を回避できる
+                        }
+                    }
+                }
+            }
+            
+            return true; // 詰み
+        }
+        
+        // 特定プレイヤーの有効移動チェック
+        function isValidMoveForCheckmate(fromRow, fromCol, toRow, toCol, promote, player) {
+            if (toRow < 0 || toRow >= 9 || toCol < 0 || toCol >= 9) return false;
+            
+            const piece = gameState.board[fromRow][fromCol];
+            const targetPiece = gameState.board[toRow][toCol];
+            
+            // 自分の駒は取れない
+            if (targetPiece && gameState.pieceOwners[toRow][toCol] === player) return false;
+            
+            // 成り後の駒の移動パターンをチェック
+            let checkPiece = piece;
+            if (promote && canPromote(piece)) {
+                checkPiece = promotedPieces[piece];
+            }
+            
+            // 移動パターンチェック
+            const tempPiece = gameState.board[fromRow][fromCol];
+            const tempOwner = gameState.pieceOwners[fromRow][fromCol];
+            gameState.board[fromRow][fromCol] = checkPiece;
+            gameState.pieceOwners[fromRow][fromCol] = player;
+            
+            const validPattern = checkMovePattern(checkPiece, fromRow, fromCol, toRow, toCol);
+            
+            gameState.board[fromRow][fromCol] = tempPiece;
+            gameState.pieceOwners[fromRow][fromCol] = tempOwner;
+            
+            if (!validPattern) return false;
+            
+            // 自殺手はダメ
+            if (isSuicideMoveForPlayer(fromRow, fromCol, toRow, toCol, promote, player)) return false;
+            
+            return true;
+        }
+        
+        // 特定プレイヤーの自殺手チェック
+        function isSuicideMoveForPlayer(fromRow, fromCol, toRow, toCol, promote, player) {
+            const originalPiece = gameState.board[toRow][toCol];
+            const originalOwner = gameState.pieceOwners[toRow][toCol];
+            const movingPiece = gameState.board[fromRow][fromCol];
+            const movingOwner = gameState.pieceOwners[fromRow][fromCol];
+            
+            let finalPiece = movingPiece;
+            if (promote && canPromote(movingPiece)) {
+                finalPiece = promotedPieces[movingPiece];
+            }
+            
+            // 一時的に移動
+            gameState.board[toRow][toCol] = finalPiece;
+            gameState.board[fromRow][fromCol] = '';
+            gameState.pieceOwners[toRow][toCol] = movingOwner;
+            gameState.pieceOwners[fromRow][fromCol] = null;
+            
+            // 指定プレイヤーの王が王手になるかチェック
+            const inCheck = isCheck(player);
+            
+            // 元に戻す
+            gameState.board[fromRow][fromCol] = movingPiece;
+            gameState.board[toRow][toCol] = originalPiece;
+            gameState.pieceOwners[fromRow][fromCol] = movingOwner;
+            gameState.pieceOwners[toRow][toCol] = originalOwner;
+            
+            return inCheck;
+        }
+        
+        // 特定プレイヤーの駒打ちチェック
+        function canDropPieceForPlayer(piece, row, col, player) {
+            // 歩の二歩チェック
+            if (piece === '歩') {
+                for (let r = 0; r < 9; r++) {
+                    if (gameState.board[r][col] === '歩' && 
+                        gameState.pieceOwners[r][col] === player) {
+                        return false;
+                    }
+                }
+            }
+            
+            // 駒の配置制限チェック
+            if (player === 'sente') {
+                if (piece === '歩' && row === 0) return false;
+                if (piece === '香' && row === 0) return false;
+                if (piece === '桂' && row <= 1) return false;
+            } else {
+                if (piece === '歩' && row === 8) return false;
+                if (piece === '香' && row === 8) return false;
+                if (piece === '桂' && row >= 7) return false;
+            }
+            
+            return true;
+        }
+        
+        // 特定プレイヤーの駒打ち自殺手チェック
+        function isSuicideDropMoveForPlayer(row, col, piece, player) {
+            // 一時的に駒を打つ
+            gameState.board[row][col] = piece;
+            gameState.pieceOwners[row][col] = player;
+            
+            // 指定プレイヤーの王が王手になるかチェック
+            const inCheck = isCheck(player);
+            
+            // 元に戻す
+            gameState.board[row][col] = '';
+            gameState.pieceOwners[row][col] = null;
+            
+            return inCheck;
+        }
+        
+        // 特定プレイヤーの詰みチェック用の移動テスト
+        function testMoveForCheckmateWithPlayer(fromRow, fromCol, toRow, toCol, promote, player) {
+            const originalPiece = gameState.board[toRow][toCol];
+            const originalOwner = gameState.pieceOwners[toRow][toCol];
+            const movingPiece = gameState.board[fromRow][fromCol];
+            const movingOwner = gameState.pieceOwners[fromRow][fromCol];
+            
+            let finalPiece = movingPiece;
+            if (promote && canPromote(movingPiece)) {
+                finalPiece = promotedPieces[movingPiece];
+            }
+            
+            // 一時的に移動
+            gameState.board[toRow][toCol] = finalPiece;
+            gameState.board[fromRow][fromCol] = '';
+            gameState.pieceOwners[toRow][toCol] = movingOwner;
+            gameState.pieceOwners[fromRow][fromCol] = null;
+            
+            // 王手が回避できるかチェック
+            const stillInCheck = isCheck(player);
+            
+            // 元に戻す
+            gameState.board[fromRow][fromCol] = movingPiece;
+            gameState.board[toRow][toCol] = originalPiece;
+            gameState.pieceOwners[fromRow][fromCol] = movingOwner;
+            gameState.pieceOwners[toRow][toCol] = originalOwner;
+            
+            return !stillInCheck;
+        }
+        
+        // 王手チェック
+        function isCheck(player = null) {
+            if (!player) player = gameState.turn === 'sente' ? 'gote' : 'sente'; // 相手の王が王手されているかチェック
+            
+            // 王の位置を探す
+            let kingRow = -1, kingCol = -1;
+            for (let row = 0; row < 9; row++) {
+                for (let col = 0; col < 9; col++) {
+                    if (gameState.board[row][col] === '王' && gameState.pieceOwners[row][col] === player) {
+                        kingRow = row;
+                        kingCol = col;
+                        break;
+                    }
+                }
+                if (kingRow !== -1) break;
+            }
+            
+            if (kingRow === -1) return false; // 王が見つからない
+            
+            // 相手の駒が王を攻撃できるかチェック
+            const opponent = player === 'sente' ? 'gote' : 'sente';
+            for (let row = 0; row < 9; row++) {
+                for (let col = 0; col < 9; col++) {
+                    if (gameState.board[row][col] !== '' && gameState.pieceOwners[row][col] === opponent) {
+                        if (canAttackSquare(row, col, kingRow, kingCol)) {
+                            return true;
+                        }
+                    }
+                }
+            }
+            
+            return false;
+        }
+        
+        // 指定の駒が指定の座標を攻撃できるかチェック
+        function canAttackSquare(fromRow, fromCol, toRow, toCol) {
+            const piece = gameState.board[fromRow][fromCol];
+            if (!piece) return false;
+            
+            return checkMovePattern(piece, fromRow, fromCol, toRow, toCol);
+        }
+        
+        // 自殺手チェック（移動後に自分の王が王手になるかチェック）
+        function isSuicideMove(fromRow, fromCol, toRow, toCol, promote = false) {
+            // 仮想的に駒を移動してみる
+            const originalPiece = gameState.board[toRow][toCol];
+            const originalOwner = gameState.pieceOwners[toRow][toCol];
+            const movingPiece = gameState.board[fromRow][fromCol];
+            const movingOwner = gameState.pieceOwners[fromRow][fromCol];
+            
+            // 成り処理
+            let finalPiece = movingPiece;
+            if (promote && canPromote(movingPiece)) {
+                finalPiece = promotedPieces[movingPiece];
+            }
+            
+            // 一時的に移動
+            gameState.board[toRow][toCol] = finalPiece;
+            gameState.board[fromRow][fromCol] = '';
+            gameState.pieceOwners[toRow][toCol] = movingOwner;
+            gameState.pieceOwners[fromRow][fromCol] = null;
+            
+            // 自分の王が王手になるかチェック
+            const inCheck = isCheck(gameState.turn);
+            
+            // 元に戻す
+            gameState.board[fromRow][fromCol] = movingPiece;
+            gameState.board[toRow][toCol] = originalPiece;
+            gameState.pieceOwners[fromRow][fromCol] = movingOwner;
+            gameState.pieceOwners[toRow][toCol] = originalOwner;
+            
+            return inCheck;
+        }
+        
+        // 駒打ちの自殺手チェック
+        function isSuicideDropMove(row, col, piece) {
+            // 一時的に駒を打つ
+            gameState.board[row][col] = piece;
+            gameState.pieceOwners[row][col] = gameState.turn;
+            
+            // 自分の王が王手になるかチェック
+            const inCheck = isCheck(gameState.turn);
+            
+            // 元に戻す
+            gameState.board[row][col] = '';
+            gameState.pieceOwners[row][col] = null;
+            
+            return inCheck;
+        }
+        
+        // 有効な移動かチェック（成りも考慮）
+        function isValidMoveWithPromotion(fromRow, fromCol, toRow, toCol, promote = false) {
+            if (toRow < 0 || toRow >= 9 || toCol < 0 || toCol >= 9) return false;
+            
+            const piece = gameState.board[fromRow][fromCol];
+            const targetPiece = gameState.board[toRow][toCol];
+            
+            // 自分の駒は取れない
+            if (targetPiece && gameState.pieceOwners[toRow][toCol] === gameState.turn) return false;
+            
+            // 成り後の駒の移動パターンをチェック
+            let checkPiece = piece;
+            if (promote && canPromote(piece)) {
+                checkPiece = promotedPieces[piece];
+            }
+            
+            // 移動パターンチェック（一時的に成り駒として確認）
+            const tempPiece = gameState.board[fromRow][fromCol];
+            gameState.board[fromRow][fromCol] = checkPiece;
+            const validPattern = checkMovePattern(checkPiece, fromRow, fromCol, toRow, toCol);
+            gameState.board[fromRow][fromCol] = tempPiece;
+            
+            if (!validPattern) return false;
+            
+            // 自殺手はダメ
+            if (isSuicideMove(fromRow, fromCol, toRow, toCol, promote)) return false;
+            
+            return true;
+        }
+        
+        // 詰みチェック
+        function isCheckmate() {
+            // 現在の手番プレイヤーが王手されているかチェック
+            if (!isCheck(gameState.turn)) return false;
+            
+            // 全ての合法手を試して、王手を回避できるかチェック
+            for (let fromRow = 0; fromRow < 9; fromRow++) {
+                for (let fromCol = 0; fromCol < 9; fromCol++) {
+                    if (gameState.board[fromRow][fromCol] !== '' && 
+                        gameState.pieceOwners[fromRow][fromCol] === gameState.turn) {
+                        
+                        const piece = gameState.board[fromRow][fromCol];
+                        const owner = gameState.pieceOwners[fromRow][fromCol];
+                        
+                        // この駒の全ての移動先を試す
+                        for (let toRow = 0; toRow < 9; toRow++) {
+                            for (let toCol = 0; toCol < 9; toCol++) {
+                                // 通常の移動
+                                if (isValidMove(fromRow, fromCol, toRow, toCol)) {
+                                    if (testMoveForCheckmate(fromRow, fromCol, toRow, toCol, false)) {
+                                        return false;
+                                    }
+                                }
+                                
+                                // 成りを伴う移動
+                                if (canPromoteMove(piece, fromRow, toRow, owner) && 
+                                    isValidMoveWithPromotion(fromRow, fromCol, toRow, toCol, true)) {
+                                    if (testMoveForCheckmate(fromRow, fromCol, toRow, toCol, true)) {
+                                        return false;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // 駒打ちで王手を回避できるかチェック
+            const capturedPieces = gameState.capturedPieces[gameState.turn];
+            for (let piece of capturedPieces) {
+                for (let row = 0; row < 9; row++) {
+                    for (let col = 0; col < 9; col++) {
+                        if (gameState.board[row][col] === '' && 
+                            canDropPiece(piece, row, col) && 
+                            !isSuicideDropMove(row, col, piece)) {
+                            return false; // 駒打ちで王手を回避できる
+                        }
+                    }
+                }
+            }
+            
+            return true; // 詰み
+        }
+        
+        // 詰みチェック用の移動テスト
+        function testMoveForCheckmate(fromRow, fromCol, toRow, toCol, promote) {
+            const originalPiece = gameState.board[toRow][toCol];
+            const originalOwner = gameState.pieceOwners[toRow][toCol];
+            const movingPiece = gameState.board[fromRow][fromCol];
+            const movingOwner = gameState.pieceOwners[fromRow][fromCol];
+            
+            let finalPiece = movingPiece;
+            if (promote && canPromote(movingPiece)) {
+                finalPiece = promotedPieces[movingPiece];
+            }
+            
+            // 一時的に移動
+            gameState.board[toRow][toCol] = finalPiece;
+            gameState.board[fromRow][fromCol] = '';
+            gameState.pieceOwners[toRow][toCol] = movingOwner;
+            gameState.pieceOwners[fromRow][fromCol] = null;
+            
+            // 王手が回避できるかチェック
+            const stillInCheck = isCheck(gameState.turn);
+            
+            // 元に戻す
+            gameState.board[fromRow][fromCol] = movingPiece;
+            gameState.board[toRow][toCol] = originalPiece;
+            gameState.pieceOwners[fromRow][fromCol] = movingOwner;
+            gameState.pieceOwners[toRow][toCol] = originalOwner;
+            
+            return !stillInCheck;
+        }
+        
+        // 棋譜記録
+        function recordMove(fromRow, fromCol, toRow, toCol, piece, captured, promoted = false) {
+            const move = {
+                from: `${fromRow}${fromCol}`,
+                to: `${toRow}${toCol}`,
+                piece: piece,
+                captured: captured,
+                promoted: promoted,
+                player: gameState.turn === 'sente' ? 'gote' : 'sente' // 記録時点では既に手番が変わっている
+            };
+            
+            gameState.moveHistory.push(move);
+            updateMoveDisplay();
+        }
+        
+        // 駒打ち記録
+        function recordDrop(row, col, piece) {
+            const move = {
+                drop: true,
+                to: `${row}${col}`,
+                piece: piece,
+                player: gameState.turn === 'sente' ? 'gote' : 'sente' // 記録時点では既に手番が変わっている
+            };
+            
+            gameState.moveHistory.push(move);
+            updateMoveDisplay();
+        }
+        
+        // 表示更新
+        function updateDisplay() {
+            const turnIndicator = document.getElementById('turnIndicator');
+            const currentPlayer = gameState.turn === 'sente' ? '先手' : '後手';
+            
+            if (isCheck(gameState.turn)) {
+                turnIndicator.textContent = `${currentPlayer}の番（王手）`;
+                turnIndicator.className = 'turn-indicator check-indicator';
+            } else {
+                turnIndicator.textContent = `${currentPlayer}の番`;
+                turnIndicator.className = 'turn-indicator';
+            }
+            
+            document.getElementById('moveCount').textContent = gameState.moveHistory.length;
+            
+            updateCapturedPieces();
+        }
+        
+        // 持ち駒表示更新
+        function updateCapturedPieces() {
+            const senteDiv = document.getElementById('senteCaptured');
+            const goteDiv = document.getElementById('goteCaptured');
+            
+            senteDiv.innerHTML = '';
+            goteDiv.innerHTML = '';
+            
+            gameState.capturedPieces.sente.forEach(piece => {
+                const pieceElement = document.createElement('div');
+                pieceElement.className = 'captured-piece';
+                pieceElement.textContent = piece;
+                pieceElement.title = `クリックで${piece}を打つ（再クリックでキャンセル）`;
+                pieceElement.addEventListener('click', () => {
+                    if (gameState.turn !== 'sente') {
+                        showNotification('相手の手番です', 'warning');
+                        return;
+                    }
+                    handleCapturedPieceClick(piece, 'sente');
+                });
+                senteDiv.appendChild(pieceElement);
+            });
+            
+            gameState.capturedPieces.gote.forEach(piece => {
+                const pieceElement = document.createElement('div');
+                pieceElement.className = 'captured-piece';
+                pieceElement.textContent = piece;
+                pieceElement.title = `クリックで${piece}を打つ（再クリックでキャンセル）`;
+                pieceElement.addEventListener('click', () => {
+                    if (gameState.turn !== 'gote') {
+                        showNotification('相手の手番です', 'warning');
+                        return;
+                    }
+                    handleCapturedPieceClick(piece, 'gote');
+                });
+                goteDiv.appendChild(pieceElement);
+            });
+        }
+        
+        // 手順表示更新
+        function updateMoveDisplay() {
+            const historyDiv = document.getElementById('moveHistory');
+            historyDiv.innerHTML = '';
+            
+            gameState.moveHistory.forEach((move, index) => {
+                const moveElement = document.createElement('div');
+                if (move.drop) {
+                    moveElement.textContent = `${index + 1}. ${move.piece}打${move.to}`;
+                } else {
+                    let moveText = `${index + 1}. ${move.piece}${move.from}→${move.to}`;
+                    if (move.captured) {
+                        moveText += `(${move.captured})`;
+                    }
+                    if (move.promoted) {
+                        moveText += '成';
+                    }
+                    moveElement.textContent = moveText;
+                }
+                historyDiv.appendChild(moveElement);
+            });
+            
+            historyDiv.scrollTop = historyDiv.scrollHeight;
+        }
+        
+        // ゲーム状態更新
+        function updateGameStatus(status) {
+            document.getElementById('gameStatus').textContent = status;
+        }
+        
+        // ゲーム終了表示
+        function showGameOver(winner) {
+            document.getElementById('gameOverTitle').textContent = 'ゲーム終了';
+            document.getElementById('gameOverMessage').textContent = `${winner}の勝利！`;
+            document.getElementById('gameOverModal').style.display = 'block';
+            
+            // ゲーム状態も更新
+            updateGameStatus(`${winner}の勝利`);
+        }
+        
+        // モーダルクローズ
+        function closeModal() {
+            document.getElementById('gameOverModal').style.display = 'none';
+            document.getElementById('promotionModal').style.display = 'none';
+        }
+        
+        // 新しいゲーム
+        function newGame() {
+            gameState = {
+                board: JSON.parse(JSON.stringify(initialBoard)),
+                turn: 'sente',
+                selectedCell: null,
+                capturedPieces: { sente: [], gote: [] },
+                moveHistory: [],
+                gameOver: false,
+                dropMode: false,
+                selectedPiece: null,
+                pieceOwners: null,
+                pendingMove: null
+            };
+            
+            initPieceOwners();
+            clearSelection();
+            closeModal();
+            initBoard();
+            updateGameStatus('対局中');
+        }
+        
+        // 待った
+        function undoMove() {
+            if (gameState.moveHistory.length === 0) return;
+            
+            const lastMove = gameState.moveHistory.pop();
+            
+            if (lastMove.drop) {
+                // 駒打ちを取り消す
+                const row = parseInt(lastMove.to[0]);
+                const col = parseInt(lastMove.to[1]);
+                gameState.board[row][col] = '';
+                gameState.pieceOwners[row][col] = null;
+                gameState.capturedPieces[lastMove.player].push(lastMove.piece);
+            } else {
+                // 駒移動を取り消す
+                const fromRow = parseInt(lastMove.from[0]);
+                const fromCol = parseInt(lastMove.from[1]);
+                const toRow = parseInt(lastMove.to[0]);
+                const toCol = parseInt(lastMove.to[1]);
+                
+                // 成りを取り消す
+                let originalPiece = lastMove.piece;
+                if (lastMove.promoted && isPromoted(lastMove.piece)) {
+                    originalPiece = originalPieces[lastMove.piece];
+                }
+                
+                // 駒を元の位置に戻す
+                gameState.board[fromRow][fromCol] = originalPiece;
+                gameState.pieceOwners[fromRow][fromCol] = lastMove.player;
+                
+                // 取った駒を復元
+                gameState.board[toRow][toCol] = lastMove.captured || '';
+                gameState.pieceOwners[toRow][toCol] = lastMove.captured ? 
+                    (lastMove.player === 'sente' ? 'gote' : 'sente') : null;
+                
+                if (lastMove.captured) {
+                    const capturedArray = gameState.capturedPieces[lastMove.player];
+                    // 成駒として取った場合は元の駒を探す
+                    const pieceToRemove = isPromoted(lastMove.captured) ? 
+                        originalPieces[lastMove.captured] : lastMove.captured;
+                    const index = capturedArray.lastIndexOf(pieceToRemove);
+                    if (index > -1) {
+                        capturedArray.splice(index, 1);
+                    }
+                }
+            }
+            
+            gameState.turn = gameState.turn === 'sente' ? 'gote' : 'sente';
+            gameState.gameOver = false;
+            gameState.pendingMove = null;
+            
+            closeModal();
+            initBoard();
+            updateMoveDisplay();
+            updateGameStatus('対局中');
+        }
+        
+        // 棋譜保存
+        function saveGame() {
+            const gameData = {
+                board: gameState.board,
+                capturedPieces: gameState.capturedPieces,
+                moveHistory: gameState.moveHistory,
+                turn: gameState.turn,
+                pieceOwners: gameState.pieceOwners
+            };
+            
+            const dataStr = JSON.stringify(gameData);
+            const dataBlob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(dataBlob);
+            
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `shogi_game_${new Date().toISOString().slice(0, 10)}.json`;
+            link.click();
+            
+            URL.revokeObjectURL(url);
+        }
+        
+        // 棋譜読込
+        function loadGame() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.json';
+            
+            input.onchange = function(e) {
+                const file = e.target.files[0];
+                if (!file) return;
+                
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    try {
+                        const gameData = JSON.parse(e.target.result);
+                        gameState.board = gameData.board;
+                        gameState.capturedPieces = gameData.capturedPieces;
+                        gameState.moveHistory = gameData.moveHistory;
+                        gameState.turn = gameData.turn;
+                        gameState.pieceOwners = gameData.pieceOwners;
+                        gameState.gameOver = false;
+                        gameState.pendingMove = null;
+                        
+                        initBoard();
+                        updateMoveDisplay();
+                        updateGameStatus('対局中');
+                        showNotification('棋譜を読み込みました', 'info');
+                    } catch (error) {
+                        showNotification('棋譜ファイルの読み込みに失敗しました', 'error');
+                    }
+                };
+                reader.readAsText(file);
+            };
+            
+            input.click();
+        }
+        
+        // Xでシェア
+        function shareGame() {
+            const text = `将棋PWAで対局中！\n手数: ${gameState.moveHistory.length}\n現在: ${gameState.turn === 'sente' ? '先手' : '後手'}の番\n\n#将棋PWA #将棋 #PWA`;
+            const url = window.location.href;
+            const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`;
+            window.open(twitterUrl, '_blank');
+        }
+        
+        // 結果をXでシェア
+        function shareResult() {
+            const gameOverMessage = document.getElementById('gameOverMessage').textContent;
+            const text = `将棋PWAで対局終了！\n${gameOverMessage}\n手数: ${gameState.moveHistory.length}\n\n#将棋PWA #将棋 #PWA`;
+            const url = window.location.href;
+            const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`;
+            window.open(twitterUrl, '_blank');
+        }
+        
+        // 通知表示
+        function showNotification(message, type = 'info') {
+            // 既存の通知を削除
+            const existingNotification = document.querySelector('.game-notification');
+            if (existingNotification) {
+                existingNotification.remove();
+            }
+            
+            // 新しい通知を作成
+            const notification = document.createElement('div');
+            notification.className = 'game-notification';
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: ${type === 'error' ? '#e74c3c' : type === 'warning' ? '#f39c12' : '#3498db'};
+                color: white;
+                padding: 15px 20px;
+                border-radius: 8px;
+                z-index: 2000;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+                font-weight: bold;
+                font-size: 14px;
+                max-width: 300px;
+                word-wrap: break-word;
+                animation: slideIn 0.3s ease-out;
+            `;
+            
+            // アニメーションのCSS
+            const style = document.createElement('style');
+            style.textContent = `
+                @keyframes slideIn {
+                    from {
+                        transform: translateX(100%);
+                        opacity: 0;
+                    }
+                    to {
+                        transform: translateX(0);
+                        opacity: 1;
+                    }
+                }
+            `;
+            document.head.appendChild(style);
+            
+            notification.textContent = message;
+            document.body.appendChild(notification);
+            
+            // 3秒後に自動削除
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.style.animation = 'slideIn 0.3s ease-out reverse';
+                    setTimeout(() => {
+                        if (notification.parentNode) {
+                            notification.parentNode.removeChild(notification);
+                        }
+                    }, 300);
+                }
+            }, 3000);
+        }
+        
+        // 初期化
+        document.addEventListener('DOMContentLoaded', function() {
+            initPieceOwners();
+            initBoard();
+        });
+        
+        // PWA インストール
+        let deferredPrompt;
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            
+            // インストールボタンを表示
+            const installBtn = document.createElement('button');
+            installBtn.textContent = '📱 アプリをインストール';
+            installBtn.className = 'button';
+            installBtn.onclick = function() {
+                if (deferredPrompt) {
+                    deferredPrompt.prompt();
+                    deferredPrompt.userChoice.then((choiceResult) => {
+                        if (choiceResult.outcome === 'accepted') {
+                            console.log('アプリがインストールされました');
+                            showNotification('アプリがインストールされました！', 'info');
+                        }
+                        deferredPrompt = null;
+                        installBtn.remove();
+                    });
+                }
+            };
+            
+            document.querySelector('.controls').appendChild(installBtn);
+        });
+        
+        // オンライン/オフライン状態の監視
+        window.addEventListener('online', () => {
+            showNotification('オンラインに接続しました', 'info');
+        });
+        
+        window.addEventListener('offline', () => {
+            showNotification('オフラインモードです', 'warning');
+        });
+        
+        // エラーハンドリング
+        window.addEventListener('error', (e) => {
+            console.error('エラーが発生しました:', e.error);
+            showNotification('エラーが発生しました。ページを再読み込みしてください。', 'error');
+        });
+        
+        // 未処理のPromise拒否をキャッチ
+        window.addEventListener('unhandledrejection', (e) => {
+            console.error('未処理のPromise拒否:', e.reason);
+            e.preventDefault();
+        });
+    </script>
+</body>
+</html><!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>将棋PWA - 本格オンライン将棋ゲーム</title>
+    <link rel="manifest" href="data:application/json;base64,eyJuYW1lIjoi5bCG5qOLUFdBIC0g5pys5qC85YWo44Kq44Oz44Op44Kk44Oz5bCG5qOL44Ky44O844OgIiwic2hvcnRfbmFtZSI6IuWwhuajixPV0EiLCJzdGFydF91cmwiOiIvIiwiZGlzcGxheSI6InN0YW5kYWxvbmUiLCJiYWNrZ3JvdW5kX2NvbG9yIjoiI2ZmZmZmZiIsInRoZW1lX2NvbG9yIjoiIzhhNTUzNiIsImljb25zIjpbeyJzcmMiOiJkYXRhOmltYWdlL3N2Zyt4bWw7YmFzZTY0LFBITjJaeUIzYVdSMGFEMGlNVGt5SWlCb1pXbG5hSFE5SWpFNU1pSWdkbWxsZDBKdmVEMGlNQ0F3SURFNU1pQXhPVElpSUhodGJHNXpQU0pvZEhSd09pOHZkM2QzTG5jekxtOXlaeTh5TURBd0wzTjJaeUkrUEd4cGJtVmhjbWR5WVdScFpXNTBJR2xrUFNKbmNtRmtJajQ4YzNSdmNDQnZabVp6WlhROUlqQWxJaUJ6ZEc5d0xXTnZiRzl5UFNJamFHRjJZVzFsYm1SdmNVUXRZMll6T1RJdFkyUXpOVGRrTXpGa1lXVTJNVGhpWmpNNE9EZzJNamd3TkRBeE1qUXRNUzR5TmpReVpUWTNZbVV0WldZNE5XWTBMVGMxWXpVaUx3NGdQSE4wYjNBZ2IyWm1jMlYwUFNJeE1EQWxJaUJ6ZEc5d0xXTnZiRzl5UFNJamFHRjJZVzFsYm1SdmNVUXRZMll6T1RJdFkyUXpOVGRrTXpGa1lXVTJNVGhpWmpNNE9EZzJNamd3TkRBeE1qUXRNUzR5TmpReVpUWTNZbVV0WldZNE5XWTBMVGMxWXpVaUx3NGdQSFU4Y0JDbE1UZzFNVGt1YVdBOWNYUm9ZVzVqY1RCQVpqUjVZVzFsYm1SdmNVUXRZMll6T1RJdFkyUXpOVGRrTXpGa1lXVTJNVGhpWmpNNE9EZzJNamd3TkRBeE1qUXRNUzR5TmpReVpUWTNZbVV0WldZNE5XWTBMVGMxWXpVaUx3NGdQSFU4Y0JDbE1UZzFNVGt1YVdBOWNYUm9ZVzVqY1RCQVpqUjVZVzFsYm1SdmNVUXRZMll6T1RJdFkyUXpOVGRrTXpGa1lXVTJNVGhpWmpNNE9EZzJNamd3TkRBeE1qUXRNUzR5TmpReVpUWTNZbVV0WldZNE5XWTBMVGMxWXpVaUx3NGdQSFU4Y0JDbE1UZzFNVGt1YVdBOWNYUm9ZVzVqY1RCQVpqUjVZVzFsYm1SdmNVUXRZMll6T1RJdFkyUXpOVGRrTXpGa1lXVTJNVGhpWmpNNE9EZzJNamd3TkRBeE1qUXRNUzR5TmpReVpUWTNZbVV0WldZNE5XWTBMVGMxWXpVaUx3NGdQSFU4Y0JDbE1UZzFNVGt1YVdBOWNYUm9ZVzVqY1RCQVpqUjVZVzFsYm1SdmNVUXRZMll6T1RJdFkyUXpOVGRrTXpGa1lXVTJNVGhpWmpNNE9EZzJNamd3TkRBeE1qUXRNUzR5TmpReVpUWTNZbVV0WldZNE5XWTBMVGMxWXpVaUx3NGdQSFU4Y0JDbE1UZzFNVGt1YVdBOWNYUm9ZVzVqY1RCQVpqUjVZVzFsYm1SdmNVUXRZMll6T1RJdFkyUXpOVGRrTXpGa1lXVTJNVGhpWmpNNE9EZzJNamd3TkRBeE1qUXRNUzR5TmpReVpUWTNZbVV0WldZNE5XWTBMVGMxWXpVaUx3NGdQSFU4Y0JDbE1UZzFNVGt1YVdBOWNYUm9ZVzVqY1RCQVpqUjVZVzFsYm1SdmNVUXRZMll6T1RJdFkyUXpOVGRrTXpGa1lXVTJNVGhpWmpNNE9EZzJNamd3TkRBeE1qUXRNUzR5TmpReVpUWTNZbVV0WldZNE5XWTBMVGMxWXpVaUx3NGdQSFU4Y0JDbE1UZzFNVGt1YVdBOWNYUm9ZVzVqY1RCQVpqUjVZVzFsYm1SdmNVUXRZMll6T1RJdFkyUXpOVGRrTXpGa1lXVTJNVGhpWmpNNE9EZzJNamd3TkRBeE1qUXRNUzR5TmpReVpUWTNZbVV0WldZNE5XWTBMVGMxWXpVaUx3NGdQSFU4Y0JDbE1UZzFNVGt1YVdBOWNYUm9ZVzVqY1RCQVpqUjVZVzFsYm1SdmNVUXRZMll6T1RJdFkyUXpOVGRrTXpGa1lXVTJNVGhpWmpNNE9EZzJNamd3TkRBeE1qUXRNUzR5TmpReVpUWTNZbVV0WldZNE5XWTBMVGMxWXpVaUx3NGdQSFU4Y0JDbE1UZzFNVGt1YVdBOWNYUm9ZVzVqY1RCQVpqUjVZVzFsYm1SdmNVUXRZMll6T1RJdFkyUXpOVGRrTXpGa1lXVTJNVGhpWmpNNE9EZzJNamd3TkRBeE1qUXRNUzR5TmpReVpUWTNZbVV0WldZNE5XWTBMVGMxWXpVaUx3NGdQSFU4Y0JDbE1UZzFNVGt1YVdBOWNYUm9ZVzVqY1RCQVpqUjVZVzFsYm1SdmNVUXRZMll6T1RJdFkyUXpOVGRrTXpGa1lXVTJNVGhpWmpNNE9EZzJNamd3TkRBeE1qUXRNUzR5TmpReVpUWTNZbVV0WldZNE5XWTBMVGMxWXpVaUx3NGdQSFU4Y0JDbE1UZzFNVGt1YVdBOWNYUm9ZVzVqY1RCQVpqUjVZVzFsYm1SdmNVUXRZMll6T1RJdFkyUXpOVGRrTXpGa1lXVTJNVGhpWmpNNE9EZzJNamd3TkRBeE1qUXRNUzR5TmpReVpUWTNZbVV0WldZNE5XWTBMVGMxWXpVaUx3NGdQSFU4Y0JDbE1UZzFNVGt1YVdBOWNYUm9ZVzVqY1RCQVpqUjVZVzFsYm1SdmNVUXRZMll6T1RJdFkyUXpOVGRrTXpGa1lXVTJNVGhpWmpNNE9EZzJNamd3TkRBeE1qUXRNUzR5TmpReVpUWTNZbVV0WldZNE5XWTBMVGMxWXpVaUx3NGdQSFU4Y0JDbE1UZzFNVGt1YVdBOWNYUm9ZVzVqY1RCQVpqUjVZVzFsYm1SdmNVUXRZMll6T1RJdFkyUXpOVGRrTXpGa1lXVTJNVGhpWmpNNE9EZzJNamd3TkRBeE1qUXRNUzR5TmpReVpUWTNZbVV0WldZNE5XWTBMVGMxWXpVaUx3NGdQSFU4Y0JDbE1UZzFNVGt1YVdBOWNYUm9ZVzVqY1RCQVpqUjVZVzFsYm1SdmNVUXRZMll6T1RJdFkyUXpOVGRrTXpGa1lXVTJNVGhpWmpNNE9EZzJNamd3TkRBeE1qUXRNUzR5TmpReVpUWTNZbVV0WldZNE5XWTBMVGMxWXpVaUx3NGdQSFU4Y0JDbE1UZzFNVGt1YVdBOWNYUm9ZVzVqY1RCQVpqUjVZVzFsYm1SdmNVUXRZMll6T1RJdFkyUXpOVGRrTXpGa1lXVTJNVGhpWmpNNE9EZzJNamd3TkRBeE1qUXRNUzR5TmpReVpUWTNZbVV0WldZNE5XWTBMVGMxWXpVaUx3NGdQSFU4Y0JDbE1UZzFNVGt1YVdBOWNYUm9ZVzVqY1RCQVpqUjVZVzFsYm1SdmNVUXRZMll6T1RJdFkyUXpOVGRrTXpGa1lXVTJNVGhpWmpNNE9EZzJNamd3TkRBeE1qUXRNUzR5TmpReVpUWTNZbVV0WldZNE5XWTBMVGMxWXpVaUx3NGdQSFU4Y0JDbE1UZzFNVGt1YVdBOWNYUm9ZVzVqY1RCQVpqUjVZVzFsYm1SdmNVUXRZMll6T1RJdFkyUXpOVGRrTXpGa1lXVTJNVGhpWmpNNE9EZzJNamd3TkRBeE1qUXRNUzR5TmpReVpUWTNZbVV0WldZNE5XWTBMVGMxWXpVaUx3NGdQSFU4Y0JDbE1UZzFNVGt1YVdBOWNYUm9ZVzVqY1RCQVpqUjVZVzFsYm1SdmNVUXRZMll6T1RJdFkyUXpOVGRrTXpGa1lXVTJNVGhpWmpNNE9EZzJNamd3TkRBeE1qUXRNUzR5TmpReVpUWTNZbVV0WldZNE5XWTBMVGMxWXpVaUx3NGdQSFU4Y0JDbE1UZzFNVGt1YVdBOWNYUm9ZVzVqY1RCQVpqUjVZVzFsYm1SdmNVUXRZMll6T1RJdFkyUXpOVGRrTXpGa1lXVTJNVGhpWmpNNE9EZzJNamd3TkRBeE1qUXRNUzR5TmpReVpUWTNZbVV0WldZNE5XWTBMVGMxWXpVaUx3NGdQSFU4Y0JDbE1UZzFNVGt1YVdBOWNYUm9ZVzVqY1RCQVpqUjVZVzFsYm1SdmNVUXRZMll6T1RJdFkyUXpOVGRrTXpGa1lXVTJNVGhpWmpNNE9EZzJNamd3TkRBeE1qUXRNUzR5TmpReVpUWTNZbVV0WldZNE5XWTBMVGMxWXpVaUx3NGdQQzlzYVc1bFlYSkhjbUZrYVdWdWRENDhjbVZqZENCM2FXUjBhRDBpTVRreUlpQm9aV2xuYUhROUlqRTVNaUlnWm1sc2JEMGlJemhoTlRVek5pSXZQand2YzNablBnPT0iLCJzaXplcyI6IjE5MngxOTIiLCJ0eXBlIjoiaW1hZ2Uvc3ZnK3htbCJ9XX0=">
+    <meta name="theme-color" content="#8a5536">
+    <meta name="description" content="ブラウザで楽しめる本格的な将棋PWAアプリ。オフライン対応、成り・王手・詰み・打ち歩詰め対応、棋譜保存機能付き。">
+    <meta name="keywords" content="将棋,PWA,オンライン,ゲーム,棋譜,オフライン,スマホ">
+    <meta name="author" content="Shogi PWA Developer">
+    <meta name="robots" content="index, follow">
+    
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="将棋PWA - 本格オンライン将棋ゲーム">
+    <meta name="twitter:description" content="ブラウザで楽しめる本格的な将棋アプリ。オフライン対応、成り・王手・詰み・打ち歩詰め対応、棋譜保存機能付き。">
+    <meta name="twitter:image" content="https://via.placeholder.com/1200x630/8a5536/ffffff?text=将棋PWA">
+    
+    <!-- Open Graph -->
+    <meta property="og:title" content="将棋PWA - 本格オンライン将棋ゲーム">
+    <meta property="og:description" content="ブラウザで楽しめる本格的な将棋アプリ。オフライン対応、成り・王手・詰み・打ち歩詰め対応、棋譜保存機能付き。">
+    <meta property="og:image" content="https://via.placeholder.com/1200x630/8a5536/ffffff?text=将棋PWA">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="">
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', 'Meiryo', sans-serif;
+            background: linear-gradient(135deg, #f4f1eb 0%, #e8dcc6 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            color: #333;
+            user-select: none;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #8a5536 0%, #b8860b 100%);
+            color: white;
+            padding: 15px 20px;
+            text-align: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .header h1 {
+            font-size: 1.8rem;
+            margin-bottom: 5px;
+        }
+        
+        .turn-indicator {
+            font-size: 1.2rem;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        
+        .check-indicator {
+            color: #ff6b6b;
+            animation: pulse 1s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+        
+        .game-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+        }
+        
+        .board-container {
+            position: relative;
+            margin: 20px 0;
+        }
+        
+        .board {
+            display: grid;
+            grid-template-columns: repeat(9, 45px);
+            grid-template-rows: repeat(9, 45px);
+            gap: 1px;
+            background: #654321;
+            border: 3px solid #8a5536;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        }
+        
+        .cell {
+            background: #f4d03f;
+            border: 1px solid #8a5536;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s;
+            position: relative;
+        }
+        
+        .cell:hover {
+            background: #f7dc6f;
+        }
+        
+        .cell.selected {
+            background: #85c1e9;
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.3);
+        }
+        
+        .cell.possible-move {
+            background: #aed6f1;
+        }
+        
+        .cell.enemy-piece {
+            background: #f1948a;
+        }
+        
+        .piece {
+            color: #000;
+            font-size: 16px;
+            font-weight: bold;
+            text-align: center;
+            line-height: 1;
+        }
+        
+        .piece.sente {
+            color: #000;
+        }
+        
+        .piece.gote {
+            color: #8b0000;
+            transform: rotate(180deg);
+        }
+        
+        .piece.promoted {
+            color: #d4af37;
+        }
+        
+        .captures {
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+            max-width: 600px;
+            margin: 20px 0;
+        }
+        
+        .capture-area {
+            background: rgba(255,255,255,0.8);
+            border: 2px solid #8a5536;
+            border-radius: 10px;
+            padding: 15px;
+            min-height: 100px;
+            width: 45%;
+        }
+        
+        .capture-area h3 {
+            margin-bottom: 10px;
+            color: #8a5536;
+        }
+        
+        .captured-pieces {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+        }
+        
+        .captured-piece {
+            background: #f4d03f;
+            border: 1px solid #8a5536;
+            padding: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+            border-radius: 3px;
+            transition: all 0.2s;
+        }
+        
+        .captured-piece:hover {
+            background: #f7dc6f;
+            transform: translateY(-1px);
+        }
+        
+        .captured-piece.selected {
+            background: #85c1e9;
+            border-color: #3498db;
+            box-shadow: 0 0 5px rgba(52, 152, 219, 0.5);
+        }
+        
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin: 20px 0;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        
+        .button {
+            background: linear-gradient(135deg, #8a5536 0%, #b8860b 100%);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+        
+        .button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+        }
+        
+        .button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        
+        .game-info {
+            background: rgba(255,255,255,0.9);
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+            max-width: 600px;
+            width: 100%;
+        }
+        
+        .move-history {
+            max-height: 200px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            padding: 10px;
+            margin-top: 10px;
+            background: white;
+            border-radius: 5px;
+        }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.7);
+            z-index: 1000;
+        }
+        
+        .modal-content {
+            background: white;
+            margin: 10% auto;
+            padding: 30px;
+            border-radius: 10px;
+            max-width: 400px;
+            text-align: center;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            animation: modalAppear 0.3s ease-out;
+        }
+        
+        @keyframes modalAppear {
+            from {
+                opacity: 0;
+                transform: translateY(-50px) scale(0.8);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+        
+        .game-over-modal {
+            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a52 100%);
+            color: white;
+            border: 3px solid #c0392b;
+        }
+        
+        .game-over-modal h2 {
+            font-size: 2.5rem;
+            margin-bottom: 20px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .game-over-modal p {
+            font-size: 1.5rem;
+            margin-bottom: 25px;
+            font-weight: bold;
+        }
+        
+        .promotion-modal {
+            background: linear-gradient(135deg, #f4d03f 0%, #f39c12 100%);
+            border: 3px solid #8a5536;
+        }
+        
+        .promotion-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-top: 20px;
+        }
+        
+        .promotion-button {
+            background: #8a5536;
+            color: white;
+            border: none;
+            padding: 15px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 18px;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+        
+        .promotion-button:hover {
+            background: #b8860b;
+            transform: translateY(-2px);
+        }
+        
+        .share-button {
+            background: #1da1f2;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 10px;
+        }
+        
+        @media (max-width: 600px) {
+            .board {
+                grid-template-columns: repeat(9, 35px);
+                grid-template-rows: repeat(9, 35px);
+            }
+            
+            .cell {
+                font-size: 16px;
+            }
+            
+            .piece {
+                font-size: 12px;
+            }
+            
+            .captures {
+                flex-direction: column;
+                gap: 10px;
+            }
+            
+            .capture-area {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🏯 将棋PWA</h1>
+        <div class="turn-indicator" id="turnIndicator">先手の番</div>
+    </div>
+    
+    <div class="game-container">
+        <div class="captures">
+            <div class="capture-area">
+                <h3>🔴 後手の駒台</h3>
+                <div class="captured-pieces" id="goteCaptured"></div>
+            </div>
+            <div class="capture-area">
+                <h3>⚫ 先手の駒台</h3>
+                <div class="captured-pieces" id="senteCaptured"></div>
+            </div>
+        </div>
+        
+        <div class="board-container">
+            <div class="board" id="board"></div>
+        </div>
+        
+        <div class="controls">
+            <button class="button" onclick="newGame()">新しいゲーム</button>
+            <button class="button" onclick="undoMove()" id="undoBtn">待った</button>
+            <button class="button" onclick="saveGame()">棋譜保存</button>
+            <button class="button" onclick="loadGame()">棋譜読込</button>
+            <button class="button" onclick="shareGame()">Xでシェア</button>
+        </div>
+        
+        <div class="game-info">
+            <h3>ゲーム情報</h3>
+            <p>手数: <span id="moveCount">0</span></p>
+            <p>状態: <span id="gameStatus">対局中</span></p>
+            <div class="move-history" id="moveHistory"></div>
+        </div>
+    </div>
+    
+    <div class="modal" id="gameOverModal">
+        <div class="modal-content game-over-modal">
+            <h2 id="gameOverTitle">ゲーム終了</h2>
+            <p id="gameOverMessage"></p>
+            <button class="button" onclick="closeModal()">閉じる</button>
+            <button class="button" onclick="newGame()">新しいゲーム</button>
+            <button class="share-button" onclick="shareResult()">🐦 結果をXでシェア</button>
+        </div>
+    </div>
+    
+    <div class="modal" id="promotionModal">
+        <div class="modal-content promotion-modal">
+            <h2>成りますか？</h2>
+            <p id="promotionMessage"></p>
+            <div class="promotion-buttons">
+                <button class="promotion-button" onclick="doPromotion(true)">成る</button>
+                <button class="promotion-button" onclick="doPromotion(false)">成らない</button>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // 将棋の初期配置
+        const initialBoard = [
+            ['香','桂','銀','金','王','金','銀','桂','香'],
+            ['','飛','','','','','','角',''],
+            ['歩','歩','歩','歩','歩','歩','歩','歩','歩'],
+            ['','','','','','','','',''],
+            ['','','','','','','','',''],
+            ['','','','','','','','',''],
+            ['歩','歩','歩','歩','歩','歩','歩','歩','歩'],
+            ['','角','','','','','','飛',''],
+            ['香','桂','銀','金','王','金','銀','桂','香']
+        ];
+        
+        // 駒の移動パターン
+        const movePatterns = {
+            '王': [[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]],
+            '金': [[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,0]],
+            '銀': [[-1,-1],[-1,1],[1,-1],[1,0],[1,1]],
+            '桂': [[-2,-1],[-2,1]],
+            '香': 'line_up',
+            '飛': 'cross',
+            '角': 'diagonal',
+            '歩': [[-1,0]]
+        };
+        
+        // 成駒の移動パターン
+        const promotedMoves = {
+            'と': movePatterns['金'],
+            '杏': movePatterns['金'],
+            '圭': movePatterns['金'],
+            '全': movePatterns['金'],
+            '馬': 'promoted_bishop',
+            '龍': 'promoted_rook'
+        };
+        
+        // 成駒の表示文字
+        const promotedPieces = {
+            '歩': 'と',
+            '香': '杏',
+            '桂': '圭',
+            '銀': '全',
+            '角': '馬',
+            '飛': '龍'
+        };
+        
+        // 成駒から元の駒へ
+        const originalPieces = {
+            'と': '歩',
+            '杏': '香',
+            '圭': '桂',
+            '全': '銀',
+            '馬': '角',
+            '龍': '飛'
+        };
+        
+        // 成れる駒かチェック
+        function canPromote(piece) {
+            return promotedPieces.hasOwnProperty(piece);
+        }
+        
+        // 成駒かチェック
+        function isPromoted(piece) {
+            return originalPieces.hasOwnProperty(piece);
+        }
+        
+        // 成りゾーンかチェック
+        function isPromotionZone(row, player) {
+            if (player === 'sente') {
+                return row <= 2; // 先手は上3行（相手陣）
+            } else {
+                return row >= 6; // 後手は下3行（相手陣）
+            }
+        }
+        
+        // 成りが可能かチェック（移動元または移動先が成りゾーン）
+        function canPromoteMove(piece, fromRow, toRow, player) {
+            if (!canPromote(piece) || isPromoted(piece)) return false;
+            
+            // 移動元または移動先が成りゾーンにある場合のみ成り可能
+            return isPromotionZone(fromRow, player) || isPromotionZone(toRow, player);
+        }
+        
+        // 成りが強制かチェック
+        function isForcedPromotion(piece, toRow, player) {
+            if (player === 'sente') {
+                if (piece === '歩' && toRow === 0) return true;
+                if (piece === '香' && toRow === 0) return true;
+                if (piece === '桂' && toRow <= 1) return true;
+            } else {
+                if (piece === '歩' && toRow === 8) return true;
+                if (piece === '香' && toRow === 8) return true;
+                if (piece === '桂' && toRow >= 7) return true;
+            }
+            return false;
+        }
+        
+        // ゲーム状態
+        let gameState = {
+            board: JSON.parse(JSON.stringify(initialBoard)),
+            turn: 'sente', // 'sente' または 'gote'
+            selectedCell: null,
+            capturedPieces: { sente: [], gote: [] },
+            moveHistory: [],
+            gameOver: false,
+            dropMode: false,
+            selectedPiece: null,
+            pieceOwners: null, // 駒の所有者情報
+            pendingMove: null // 成り判定待ちの移動
+        };
+        
+        // 初期配置の駒の所有者を設定
+        function initPieceOwners() {
+            gameState.pieceOwners = [];
+            for (let row = 0; row < 9; row++) {
+                gameState.pieceOwners[row] = [];
+                for (let col = 0; col < 9; col++) {
+                    if (gameState.board[row][col] !== '') {
+                        gameState.pieceOwners[row][col] = row < 3 ? 'gote' : 'sente';
+                    } else {
+                        gameState.pieceOwners[row][col] = null;
+                    }
+                }
+            }
+        }
+        
+        // Service Worker登録
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('data:text/javascript;base64,Y29uc3QgQ0FDSEVfTkFNRSA9ICdzaG9naS1wd2EtdjEnOwpjb25zdCB1cmxzVG9DYWNoZSA9IFsKICAgICcvJywKICAgICcvbWFuaWZlc3QuanNvbicKXTsKCnNlbGYuYWRkRXZlbnRMaXN0ZW5lcignaW5zdGFsbCcsIChldmVudCkgPT4gewogICAgZXZlbnQud2FpdFVudGlsKAogICAgICAgIGNhY2hlcy5vcGVuKENBQ0hFX05BTUUpCiAgICAgICAgICAgIC50aGVuKChjYWNoZSkgPT4gewogICAgICAgICAgICAgICAgcmV0dXJuIGNhY2hlLmFkZEFsbCh1cmxzVG9DYWNoZSk7CiAgICAgICAgICAgIH0pCiAgICApOwp9KTsKCnNlbGYuYWRkRXZlbnRMaXN0ZW5lcignZmV0Y2gnLCAoZXZlbnQpID0+IHsKICAgIGV2ZW50LnJlc3BvbmRXaXRoKAogICAgICAgIGNhY2hlcy5tYXRjaChldmVudC5yZXF1ZXN0KQogICAgICAgICAgICAudGhlbigocmVzcG9uc2UpID0+IHsKICAgICAgICAgICAgICAgIGlmIChyZXNwb25zZSkgewogICAgICAgICAgICAgICAgICAgIHJldHVybiByZXNwb25zZTsKICAgICAgICAgICAgICAgIH0KICAgICAgICAgICAgICAgIHJldHVybiBmZXRjaChldmVudC5yZXF1ZXN0KTsKICAgICAgICAgICAgfSkKICAgICk7Cn0pOw==')
+                .then(() => console.log('Service Worker registered successfully'))
+                .catch(err => console.log('Service Worker registration failed:', err));
+        }
+        
+        // 盤面初期化
+        function initBoard() {
+            const board = document.getElementById('board');
+            board.innerHTML = '';
+            
+            for (let row = 0; row < 9; row++) {
+                for (let col = 0; col < 9; col++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'cell';
+                    cell.dataset.row = row;
+                    cell.dataset.col = col;
+                    cell.addEventListener('click', () => handleCellClick(row, col));
+                    
+                    const piece = gameState.board[row][col];
+                    if (piece) {
+                        const pieceElement = document.createElement('div');
+                        // 駒の所有者情報を保持
+                        const owner = gameState.pieceOwners ? gameState.pieceOwners[row][col] : (row < 3 ? 'gote' : 'sente');
+                        let pieceClass = `piece ${owner}`;
+                        
+                        // 成駒の場合は特別なスタイル
+                        if (isPromoted(piece)) {
+                            pieceClass += ' promoted';
+                        }
+                        
+                        pieceElement.className = pieceClass;
+                        pieceElement.textContent = piece;
+                        cell.appendChild(pieceElement);
+                    }
+                    
+                    board.appendChild(cell);
+                }
+            }
+            updateDisplay();
+        }
+        
+        // セルクリック処理
+        function handleCellClick(row, col) {
+            if (gameState.gameOver) return;
+            
+            const cell = document.querySelector(`[data-row="${row}"][data-col="${col}"]`);
+            
+            if (gameState.dropMode && gameState.selectedPiece) {
+                // 駒を打つ処理
+                if (gameState.board[row][col] === '') {
+                    // 各種チェック
+                    if (!canDropPiece(gameState.selectedPiece, row, col)) {
+                        showNotification('その場所には駒を打てません', 'error');
+                        clearSelection();
+                        return;
+                    }
+                    
+                    if (isSuicideDropMove(row, col, gameState.selectedPiece)) {
+                        showNotification('自殺手は指せません（自分の王が王手になります）', 'error');
+                        clearSelection();
+                        return;
+                    }
+                    
+                    if (isUchifudzume(row, col)) {
+                        showNotification('打ち歩詰めは反則です', 'error');
+                        clearSelection();
+                        return;
+                    }
+                    
+                    // 全てのチェックを通過したら駒を打つ
+                    dropPiece(row, col);
+                } else {
+                    // 駒がある場所をクリックした場合
+                    showNotification('その場所には既に駒があります', 'error');
+                    clearSelection();
+                }
+                return;
+            }
+            
+            if (gameState.selectedCell) {
+                const [selectedRow, selectedCol] = gameState.selectedCell;
+                
+                if (row === selectedRow && col === selectedCol) {
+                    // 同じセルをクリック - 選択解除
+                    clearSelection();
+                    return;
+                }
+                
+                // 基本的な移動チェック
+                const piece = gameState.board[selectedRow][selectedCol];
+                const targetPiece = gameState.board[row][col];
+                const owner = gameState.pieceOwners[selectedRow][selectedCol];
+                
+                // 範囲外チェック
+                if (row < 0 || row >= 9 || col < 0 || col >= 9) {
+                    clearSelection();
+                    return;
+                }
+                
+                // 自分の駒を取ろうとした場合
+                if (targetPiece && gameState.pieceOwners[row][col] === gameState.turn) {
+                    showNotification('自分の駒は取れません', 'error');
+                    clearSelection();
+                    return;
+                }
+                
+                // 移動パターンチェック
+                if (!checkMovePattern(piece, selectedRow, selectedCol, row, col)) {
+                    showNotification('その駒はそこに移動できません', 'error');
+                    clearSelection();
+                    return;
+                }
+                
+                // 自殺手チェック
+                if (isSuicideMove(selectedRow, selectedCol, row, col)) {
+                    showNotification('自殺手は指せません（自分の王が王手になります）', 'error');
+                    clearSelection();
+                    return;
+                }
+                
+                // 全てのチェックを通過したら移動処理
+                if (isValidMove(selectedRow, selectedCol, row, col)) {
+                    // 成り判定
+                    if (canPromoteMove(piece, selectedRow, row, owner)) {
+                        // 成りの選択が必要
+                        if (isForcedPromotion(piece, row, owner)) {
+                            // 強制成り
+                            makeMove(selectedRow, selectedCol, row, col, true);
+                        } else {
+                            // 成り選択
+                            gameState.pendingMove = {
+                                fromRow: selectedRow,
+                                fromCol: selectedCol,
+                                toRow: row,
+                                toCol: col
+                            };
+                            showPromotionDialog(piece);
+                        }
+                    } else {
+                        // 普通の移動
+                        makeMove(selectedRow, selectedCol, row, col, false);
+                    }
+                    
+                    clearSelection();
+                    return;
+                } else {
+                    // 他の理由で無効な移動
+                    showNotification('無効な移動です', 'error');
+                    clearSelection();
+                }
+            }
+            
+            // 新しい駒を選択
+            const piece = gameState.board[row][col];
+            if (piece && isPieceOwnedByCurrentPlayer(row, col)) {
+                selectCell(row, col);
+            } else if (piece) {
+                showNotification('相手の駒は選択できません', 'error');
+                clearSelection();
+            } else {
+                clearSelection();
+            }
+        }
+        
+        // 駒の所有者判定
+        function isPieceOwnedByCurrentPlayer(row, col) {
+            const piece = gameState.board[row][col];
+            if (!piece) return false;
+            
+            // 駒の所有者を盤面上の位置ではなく、実際の駒の情報で判定
+            const cell = document.querySelector(`[data-row="${row}"][data-col="${col}"]`);
+            const pieceElement = cell.querySelector('.piece');
+            
+            if (!pieceElement) return false;
+            
+            if (gameState.turn === 'sente') {
+                return pieceElement.classList.contains('sente');
+            } else {
+                return pieceElement.classList.contains('gote');
+            }
+        }
+        
+        // セル選択
+        function selectCell(row, col) {
+            clearSelection();
+            gameState.selectedCell = [row, col];
+            
+            const cell = document.querySelector(`[data-row="${row}"][data-col="${col}"]`);
+            cell.classList.add('selected');
+            
+            // 可能な移動先をハイライト
+            highlightPossibleMoves(row, col);
+        }
+        
+        // 選択クリア
+        function clearSelection() {
+            gameState.selectedCell = null;
+            gameState.dropMode = false;
+            gameState.selectedPiece = null;
+            
+            document.querySelectorAll('.cell').forEach(cell => {
+                cell.classList.remove('selected', 'possible-move', 'enemy-piece');
+            });
+            
+            document.querySelectorAll('.captured-piece').forEach(piece => {
+                piece.classList.remove('selected');
+            });
+        }
+        
+        // 可能な移動先をハイライト
+        function highlightPossibleMoves(row, col) {
+            const piece = gameState.board[row][col];
+            if (!piece) return;
+            
+            const owner = gameState.pieceOwners[row][col];
+            
+            for (let r = 0; r < 9; r++) {
+                for (let c = 0; c < 9; c++) {
+                    // 通常の移動をチェック
+                    if (isValidMove(row, col, r, c)) {
+                        const cell = document.querySelector(`[data-row="${r}"][data-col="${c}"]`);
+                        if (gameState.board[r][c]) {
+                            cell.classList.add('enemy-piece');
+                        } else {
+                            cell.classList.add('possible-move');
+                        }
+                    }
+                }
+            }
+        }
+        
+        // 有効な移動かチェック
+        function isValidMove(fromRow, fromCol, toRow, toCol) {
+            if (toRow < 0 || toRow >= 9 || toCol < 0 || toCol >= 9) return false;
+            
+            const piece = gameState.board[fromRow][fromCol];
+            const targetPiece = gameState.board[toRow][toCol];
+            
+            // 自分の駒は取れない
+            if (targetPiece && gameState.pieceOwners[toRow][toCol] === gameState.turn) return false;
+            
+            // 駒の移動パターンをチェック
+            if (!checkMovePattern(piece, fromRow, fromCol, toRow, toCol)) return false;
+            
+            // 自殺手はダメ
+            if (isSuicideMove(fromRow, fromCol, toRow, toCol)) return false;
+            
+            return true;
+        }
+        
+        // 駒の移動パターンチェック
+        function checkMovePattern(piece, fromRow, fromCol, toRow, toCol) {
+            let basePattern;
+            
+            // 成駒の場合
+            if (isPromoted(piece)) {
+                basePattern = promotedMoves[piece];
+            } else {
+                basePattern = movePatterns[piece];
+            }
+            
+            if (!basePattern) return false;
+            
+            const rowDiff = toRow - fromRow;
+            const colDiff = toCol - fromCol;
+            
+            // 駒の所有者によって移動方向を決定
+            const owner = gameState.pieceOwners[fromRow][fromCol];
+            const actualRowDiff = owner === 'sente' ? rowDiff : -rowDiff;
+            const actualColDiff = colDiff;
+            
+            if (basePattern === 'line_up') {
+                // 香車の移動
+                if (actualColDiff !== 0) return false;
+                if (actualRowDiff >= 0) return false;
+                return checkLineClear(fromRow, fromCol, toRow, toCol);
+            } else if (basePattern === 'cross') {
+                // 飛車の移動
+                if (actualRowDiff !== 0 && actualColDiff !== 0) return false;
+                return checkLineClear(fromRow, fromCol, toRow, toCol);
+            } else if (basePattern === 'diagonal') {
+                // 角の移動
+                if (Math.abs(actualRowDiff) !== Math.abs(actualColDiff)) return false;
+                return checkLineClear(fromRow, fromCol, toRow, toCol);
+            } else if (basePattern === 'promoted_bishop') {
+                // 馬の移動（角+王）
+                // 角の移動
+                if (Math.abs(actualRowDiff) === Math.abs(actualColDiff)) {
+                    return checkLineClear(fromRow, fromCol, toRow, toCol);
+                }
+                // 王の移動
+                if (Math.abs(actualRowDiff) <= 1 && Math.abs(actualColDiff) <= 1) {
+                    return true;
+                }
+                return false;
+            } else if (basePattern === 'promoted_rook') {
+                // 龍の移動（飛+王）
+                // 飛車の移動
+                if (actualRowDiff === 0 || actualColDiff === 0) {
+                    return checkLineClear(fromRow, fromCol, toRow, toCol);
+                }
+                // 王の移動
+                if (Math.abs(actualRowDiff) <= 1 && Math.abs(actualColDiff) <= 1) {
+                    return true;
+                }
+                return false;
+            } else if (Array.isArray(basePattern)) {
+                // 通常の移動パターン
+                return basePattern.some(([dr, dc]) => dr === actualRowDiff && dc === actualColDiff);
+            }
+            
+            return false;
+        }
+        
+        // 経路クリアチェック
+        function checkLineClear(fromRow, fromCol, toRow, toCol) {
+            const rowStep = toRow > fromRow ? 1 : toRow < fromRow ? -1 : 0;
+            const colStep = toCol > fromCol ? 1 : toCol < fromCol ? -1 : 0;
+            
+            let currentRow = fromRow + rowStep;
+            let currentCol = fromCol + colStep;
+            
+            while (currentRow !== toRow || currentCol !== toCol) {
+                if (gameState.board[currentRow][currentCol] !== '') return false;
+                currentRow += rowStep;
+                currentCol += colStep;
+            }
+            
+            return true;
+        }
+        
+        // 駒を移動
+        function makeMove(fromRow, fromCol, toRow, toCol, promote = false) {
+            const piece = gameState.board[fromRow][fromCol];
+            const capturedPiece = gameState.board[toRow][toCol];
+            const movingPieceOwner = gameState.pieceOwners[fromRow][fromCol];
+            
+            let finalPiece = piece;
+            
+            // 成り処理
+            if (promote && canPromote(piece)) {
+                finalPiece = promotedPieces[piece];
+            }
+            
+            // 駒を取る（成駒は元の駒として駒台に）
+            if (capturedPiece) {
+                const originalCaptured = isPromoted(capturedPiece) ? originalPieces[capturedPiece] : capturedPiece;
+                gameState.capturedPieces[gameState.turn].push(originalCaptured);
+            }
+            
+            // 駒を移動
+            gameState.board[toRow][toCol] = finalPiece;
+            gameState.board[fromRow][fromCol] = '';
+            
+            // 駒の所有者情報を更新
+            gameState.pieceOwners[toRow][toCol] = movingPieceOwner;
+            gameState.pieceOwners[fromRow][fromCol] = null;
+            
+            // 棋譜に記録
+            recordMove(fromRow, fromCol, toRow, toCol, finalPiece, capturedPiece, promote);
+            
+            // 手番交代
+            gameState.turn = gameState.turn === 'sente' ? 'gote' : 'sente';
+            
+            // 王手・詰みチェック（手番交代後にチェック）
+            if (isCheckmate()) {
+                gameState.gameOver = true;
+                const winner = gameState.turn === 'sente' ? '後手' : '先手';
+                showGameOver(winner);
+            } else if (isCheck()) {
+                updateGameStatus('王手');
+            } else {
+                updateGameStatus('対局中');
+            }
+            
+            initBoard();
+        }
+        
+        // 成りダイアログ表示
+        function showPromotionDialog(piece) {
+            const promotedPiece = promotedPieces[piece];
+            document.getElementById('promotionMessage').textContent = 
+                `${piece} を ${promotedPiece} に成りますか？`;
+            document.getElementById('promotionModal').style.display = 'block';
+        }
+        
+        // 成り決定
+        function doPromotion(promote) {
+            const move = gameState.pendingMove;
+            if (!move) return;
+            
+            document.getElementById('promotionModal').style.display = 'none';
+            makeMove(move.fromRow, move.fromCol, move.toRow, move.toCol, promote);
+            gameState.pendingMove = null;
+        }
+        
+        // 駒を打つ
+        function dropPiece(row, col) {
+            const piece = gameState.selectedPiece;
+            
+            // 自殺手チェック
+            if (isSuicideDropMove(row, col, piece)) {
+                return;
+            }
+            
+            // 駒台から駒を削除
+            const capturedArray = gameState.capturedPieces[gameState.turn];
+            const index = capturedArray.indexOf(piece);
+            if (index > -1) {
+                capturedArray.splice(index, 1);
+            }
+            
+            // 盤面に駒を配置
+            gameState.board[row][col] = piece;
+            gameState.pieceOwners[row][col] = gameState.turn;
+            
+            // 棋譜に記録
+            recordDrop(row, col, piece);
+            
+            // 手番交代
+            gameState.turn = gameState.turn === 'sente' ? 'gote' : 'sente';
+            
+            // 王手・詰みチェック（手番交代後にチェック）
+            if (isCheckmate()) {
+                gameState.gameOver = true;
+                const winner = gameState.turn === 'sente' ? '後手' : '先手';
+                showGameOver(winner);
+            } else if (isCheck()) {
+                updateGameStatus('王手');
+            } else {
+                updateGameStatus('対局中');
+            }
+            
+            clearSelection();
+            initBoard();
+        }
+        
+        // 持ち駒クリック処理
+        function handleCapturedPieceClick(piece, player) {
+            if (gameState.gameOver || gameState.turn !== player) return;
+            
+            // 同じ駒を再度クリックした場合はキャンセル
+            if (gameState.dropMode && gameState.selectedPiece === piece) {
+                clearSelection();
+                return;
+            }
+            
+            clearSelection();
+            gameState.dropMode = true;
+            gameState.selectedPiece = piece;
+            
+            // 選択した駒をハイライト
+            document.querySelectorAll('.captured-piece').forEach(el => {
+                if (el.textContent === piece && el.parentElement.id === `${player}Captured`) {
+                    el.classList.add('selected');
+                }
+            });
+            
+            // 打てる場所をハイライト
+            highlightDropTargets(piece);
+        }
+        
+        // 駒を打てる場所をハイライト
+        function highlightDropTargets(piece) {
+            for (let row = 0; row < 9; row++) {
+                for (let col = 0; col < 9; col++) {
+                    if (gameState.board[row][col] === '' && 
+                        canDropPiece(piece, row, col) && 
+                        !isSuicideDropMove(row, col, piece) &&
+                        !isUchifudzume(row, col)) {
+                        const cell = document.querySelector(`[data-row="${row}"][data-col="${col}"]`);
+                        cell.classList.add('possible-move');
+                    }
+                }
+            }
+        }
+        
+        // 駒を打てるかチェック
+        function canDropPiece(piece, row, col) {
+            return canDropPieceForPlayer(piece, row, col, gameState.turn);
+        }
+        
+        // 打ち歩詰めチェック
+        function isUchifudzume(row, col) {
+            // 歩を打つ手でない場合は打ち歩詰めではない
+            if (gameState.selectedPiece !== '歩') return false;
+            
+            // 一時的に歩を打ってみる
+            gameState.board[row][col] = '歩';
+            gameState.pieceOwners[row][col] = gameState.turn;
+            
+            // 相手の王が詰んでいるかチェック
+            const opponent = gameState.turn === 'sente' ? 'gote' : 'sente';
+            const isCheckmate = isCheck(opponent) && isCheckmateAfterMove(opponent);
+            
+            // 元に戻す
+            gameState.board[row][col] = '';
+            gameState.pieceOwners[row][col] = null;
+            
+            // 詰みかつ、打った歩によって直接王手になっている場合は打ち歩詰め
+            if (isCheckmate) {
+                // 打った歩が王手をかけているかチェック
+                const kingPosition = findKing(opponent);
+                if (kingPosition && canAttackSquare(row, col, kingPosition.row, kingPosition.col)) {
+                    return true;
+                }
+            }
+            
+            return false;
+        }
+        
+        // 王の位置を探す
+        function findKing(player) {
+            for (let row = 0; row < 9; row++) {
+                for (let col = 0; col < 9; col++) {
+                    if (gameState.board[row][col] === '王' && gameState.pieceOwners[row][col] === player) {
+                        return { row, col };
+                    }
+                }
+            }
+            return null;
+        }
+        
+        // 移動後の詰みチェック（打ち歩詰め専用）
+        function isCheckmateAfterMove(player) {
+            // 全ての合法手を試して、王手を回避できるかチェック
+            for (let fromRow = 0; fromRow < 9; fromRow++) {

@@ -314,6 +314,158 @@
             margin-top: 10px;
         }
         
+        .piece-help-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin: 15px 0;
+        }
+        
+        .piece-help-item {
+            background: #f8f9fa;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            padding: 15px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .piece-help-item:hover {
+            border-color: #8a5536;
+            background: #fff;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        
+        .piece-icon {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #8a5536;
+            margin-bottom: 5px;
+        }
+        
+        .piece-name {
+            font-weight: bold;
+            margin-bottom: 3px;
+            color: #333;
+        }
+        
+        .piece-desc {
+            font-size: 0.85rem;
+            color: #666;
+        }
+        
+        .help-tips {
+            background: #e8f5e8;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+        }
+        
+        .help-tips h5 {
+            margin: 0 0 10px 0;
+            color: #27ae60;
+        }
+        
+        .help-tips ul {
+            margin: 0;
+            padding-left: 20px;
+        }
+        
+        .help-tips li {
+            margin: 5px 0;
+            font-size: 0.9rem;
+        }
+        
+        .piece-detail-modal {
+            background: linear-gradient(135deg, #f39c12 0%, #d68910 100%);
+            color: white;
+        }
+        
+        .movement-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 40px);
+            gap: 2px;
+            margin: 20px auto;
+            justify-content: center;
+        }
+        
+        .movement-cell {
+            width: 40px;
+            height: 40px;
+            border: 1px solid rgba(255,255,255,0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        
+        .movement-cell.current {
+            background: rgba(255,255,255,0.9);
+            color: #333;
+            border-color: white;
+        }
+        
+        .movement-cell.can-move {
+            background: rgba(52, 152, 219, 0.8);
+            border-color: #3498db;
+        }
+        
+        .movement-cell.can-attack {
+            background: rgba(231, 76, 60, 0.8);
+            border-color: #e74c3c;
+        }
+        
+        .move-marker {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #3498db;
+            font-size: 16px;
+            font-weight: bold;
+            pointer-events: none;
+            animation: pulse-marker 1.5s infinite;
+        }
+        
+        @keyframes pulse-marker {
+            0% { opacity: 0.6; transform: translate(-50%, -50%) scale(1); }
+            50% { opacity: 1; transform: translate(-50%, -50%) scale(1.2); }
+            100% { opacity: 0.6; transform: translate(-50%, -50%) scale(1); }
+        }
+        
+        .cell.possible-move {
+            background: #aed6f1;
+            position: relative;
+        }
+        
+        .cell.enemy-piece {
+            background: #f1948a;
+            position: relative;
+        }
+        
+        .cell.enemy-piece::after {
+            content: '⚔️';
+            position: absolute;
+            top: 2px;
+            right: 2px;
+            font-size: 10px;
+        }
+        
+        .beginner-mode {
+            background: #e8f5e8;
+            padding: 10px;
+            border-radius: 8px;
+            margin: 10px 0;
+            border-left: 4px solid #27ae60;
+        }
+        
+        .beginner-toggle {
+            background: linear-gradient(135deg, #27ae60 0%, #16a085 100%);
+        }
+        
         .stat-item {
             background: #f8f9fa;
             padding: 10px;
@@ -545,6 +697,7 @@
         <div class="controls">
             <button class="button" onclick="showGameSetup()">新しいゲーム</button>
             <button class="button ai-button" onclick="toggleAI()" id="aiToggle">AI対戦モード</button>
+            <button class="button beginner-toggle" onclick="toggleBeginnerMode()" id="beginnerToggle">🎓 初心者モード</button>
             <button class="button" onclick="undoMove()" id="undoBtn">待った</button>
             <button class="button" onclick="getAIHint()" id="hintBtn">ヒント</button>
             <button class="button" onclick="saveGame()">棋譜保存</button>
@@ -555,6 +708,7 @@
         <div class="game-info">
             <div class="info-tabs">
                 <div class="info-tab active" onclick="switchTab('moves')">棋譜</div>
+                <div class="info-tab" onclick="switchTab('help')">駒の動き</div>
                 <div class="info-tab" onclick="switchTab('joseki')">定跡</div>
                 <div class="info-tab" onclick="switchTab('analysis')">解析</div>
                 <div class="info-tab" onclick="switchTab('stats')">戦績</div>
@@ -562,6 +716,63 @@
             
             <div class="info-content active" id="movesContent">
                 <div class="move-history" id="moveHistory"></div>
+            </div>
+            
+            <div class="info-content" id="helpContent">
+                <h4>🎓 駒の動き方ガイド</h4>
+                <div class="piece-help-grid">
+                    <div class="piece-help-item" onclick="showPieceDetail('王')">
+                        <div class="piece-icon">王</div>
+                        <div class="piece-name">王（おう）</div>
+                        <div class="piece-desc">全方向に1マス</div>
+                    </div>
+                    <div class="piece-help-item" onclick="showPieceDetail('飛')">
+                        <div class="piece-icon">飛</div>
+                        <div class="piece-name">飛車（ひしゃ）</div>
+                        <div class="piece-desc">縦横に無限</div>
+                    </div>
+                    <div class="piece-help-item" onclick="showPieceDetail('角')">
+                        <div class="piece-icon">角</div>
+                        <div class="piece-name">角行（かくぎょう）</div>
+                        <div class="piece-desc">斜めに無限</div>
+                    </div>
+                    <div class="piece-help-item" onclick="showPieceDetail('金')">
+                        <div class="piece-icon">金</div>
+                        <div class="piece-name">金将（きんしょう）</div>
+                        <div class="piece-desc">前後左右と斜め前</div>
+                    </div>
+                    <div class="piece-help-item" onclick="showPieceDetail('銀')">
+                        <div class="piece-icon">銀</div>
+                        <div class="piece-name">銀将（ぎんしょう）</div>
+                        <div class="piece-desc">前と斜め</div>
+                    </div>
+                    <div class="piece-help-item" onclick="showPieceDetail('桂')">
+                        <div class="piece-icon">桂</div>
+                        <div class="piece-name">桂馬（けいま）</div>
+                        <div class="piece-desc">前に2つ進んで左右</div>
+                    </div>
+                    <div class="piece-help-item" onclick="showPieceDetail('香')">
+                        <div class="piece-icon">香</div>
+                        <div class="piece-name">香車（きょうしゃ）</div>
+                        <div class="piece-desc">前方に無限</div>
+                    </div>
+                    <div class="piece-help-item" onclick="showPieceDetail('歩')">
+                        <div class="piece-icon">歩</div>
+                        <div class="piece-name">歩兵（ふひょう）</div>
+                        <div class="piece-desc">前に1マス</div>
+                    </div>
+                </div>
+                <div class="help-tips">
+                    <h5>💡 初心者向けのコツ</h5>
+                    <ul>
+                        <li><strong>駒を選択</strong>すると動ける場所が<span style="color: #3498db;">青</span>でハイライト</li>
+                        <li><strong>相手の駒</strong>は<span style="color: #e74c3c;">赤</span>で表示</li>
+                        <li><strong>成り</strong>：敵陣（上3段）に入ると駒が強くなる</li>
+                        <li><strong>駒打ち</strong>：取った駒は駒台から好きな場所に打てる</li>
+                        <li><strong>王手</strong>：相手の王を攻撃すると「王手」</li>
+                        <li><strong>詰み</strong>：王手から逃げられないと勝利</li>
+                    </ul>
+                </div>
             </div>
             
             <div class="info-content" id="josekiContent">
@@ -673,6 +884,19 @@
         </div>
     </div>
 
+    <!-- 駒の詳細モーダル -->
+    <div class="modal" id="pieceDetailModal">
+        <div class="modal-content piece-detail-modal">
+            <h2 id="pieceDetailTitle">駒の動き</h2>
+            <div id="pieceDetailContent">
+                <div class="movement-grid" id="movementGrid"></div>
+                <div id="pieceDescription"></div>
+                <div id="piecePromotionInfo"></div>
+            </div>
+            <button class="button" onclick="closeModal()" style="background: rgba(255,255,255,0.2); margin-top: 20px;">閉じる</button>
+        </div>
+    </div>
+
     <script>
         // 将棋の初期配置
         const initialBoard = [
@@ -729,7 +953,138 @@
             '龍': '飛'
         };
         
-        // 駒の価値（評価関数用）
+        // 駒の詳細情報
+        const pieceDetails = {
+            '王': {
+                name: '王将（おうしょう）',
+                description: '将棋で最も重要な駒。この駒を取られると負けになります。',
+                movement: '全方向（8方向）に1マスずつ動けます。',
+                promotion: 'この駒は成ることができません。',
+                pattern: [
+                    [1,1,1],
+                    [1,2,1],
+                    [1,1,1]
+                ]
+            },
+            '飛': {
+                name: '飛車（ひしゃ）',
+                description: '非常に強力な駒で、縦横に何マスでも進めます。',
+                movement: '縦と横の方向に、障害物がない限り何マスでも動けます。',
+                promotion: '成ると「龍王（龍）」になり、斜め1マスも動けるようになります。',
+                pattern: [
+                    [0,1,0],
+                    [1,2,1],
+                    [0,1,0]
+                ]
+            },
+            '角': {
+                name: '角行（かくぎょう）',
+                description: '斜めに長距離移動できる強力な駒です。',
+                movement: '斜めの方向に、障害物がない限り何マスでも動けます。',
+                promotion: '成ると「龍馬（馬）」になり、縦横1マスも動けるようになります。',
+                pattern: [
+                    [1,0,1],
+                    [0,2,0],
+                    [1,0,1]
+                ]
+            },
+            '金': {
+                name: '金将（きんしょう）',
+                description: '王の近くを守るのに適した、バランスの良い駒です。',
+                movement: '前、左、右、後ろ、斜め前2方向に1マスずつ動けます。',
+                promotion: 'この駒は成ることができません。',
+                pattern: [
+                    [1,1,1],
+                    [1,2,1],
+                    [0,1,0]
+                ]
+            },
+            '銀': {
+                name: '銀将（ぎんしょう）',
+                description: '攻撃的な動きができる駒です。',
+                movement: '前、斜め前2方向、斜め後ろ2方向に1マスずつ動けます。',
+                promotion: '成ると「成銀（全）」になり、金将と同じ動きになります。',
+                pattern: [
+                    [1,1,1],
+                    [0,2,0],
+                    [1,0,1]
+                ]
+            },
+            '桂': {
+                name: '桂馬（けいま）',
+                description: '独特な動きをする駒で、他の駒を飛び越えられます。',
+                movement: '前に2マス進んで、左右どちらかに1マス動きます（将棋のナイト）。',
+                promotion: '成ると「成桂（圭）」になり、金将と同じ動きになります。',
+                pattern: [
+                    [1,0,1],
+                    [0,0,0],
+                    [0,2,0]
+                ]
+            },
+            '香': {
+                name: '香車（きょうしゃ）',
+                description: '前方にまっすぐ進む駒です。',
+                movement: '前方に、障害物がない限り何マスでも動けます。',
+                promotion: '成ると「成香（杏）」になり、金将と同じ動きになります。',
+                pattern: [
+                    [0,1,0],
+                    [0,2,0],
+                    [0,0,0]
+                ]
+            },
+            '歩': {
+                name: '歩兵（ふひょう）',
+                description: '最も基本的な駒ですが、重要な役割を果たします。',
+                movement: '前に1マスだけ動けます。',
+                promotion: '成ると「と金（と）」になり、金将と同じ動きになります。',
+                pattern: [
+                    [0,1,0],
+                    [0,2,0],
+                    [0,0,0]
+                ]
+            }
+        };
+        
+        // 駒の詳細表示
+        function showPieceDetail(piece) {
+            const detail = pieceDetails[piece];
+            if (!detail) return;
+            
+            document.getElementById('pieceDetailTitle').textContent = `${piece} - ${detail.name}`;
+            
+            // 移動パターンの表示
+            const grid = document.getElementById('movementGrid');
+            grid.innerHTML = '';
+            
+            detail.pattern.forEach((row, r) => {
+                row.forEach((cell, c) => {
+                    const cellDiv = document.createElement('div');
+                    cellDiv.className = 'movement-cell';
+                    
+                    if (cell === 2) {
+                        cellDiv.classList.add('current');
+                        cellDiv.textContent = piece;
+                    } else if (cell === 1) {
+                        cellDiv.classList.add('can-move');
+                        cellDiv.textContent = '●';
+                    }
+                    
+                    grid.appendChild(cellDiv);
+                });
+            });
+            
+            // 説明文の表示
+            document.getElementById('pieceDescription').innerHTML = `
+                <p><strong>説明:</strong> ${detail.description}</p>
+                <p><strong>動き:</strong> ${detail.movement}</p>
+            `;
+            
+            document.getElementById('piecePromotionInfo').innerHTML = `
+                <p><strong>成り:</strong> ${detail.promotion}</p>
+            `;
+            
+            document.getElementById('pieceDetailModal').classList.add('show');
+        }
         const pieceValues = {
             '歩': 100, 'と': 600,
             '香': 350, '杏': 600,
@@ -766,6 +1121,7 @@
             aiDifficulty: 'easy',
             aiPlayer: 'gote',
             aiThinking: false,
+            beginnerMode: false, // 初心者モード
             gameStats: {
                 totalGames: 0,
                 wins: 0,
@@ -1003,7 +1359,61 @@
             return gameState.pieceOwners[row][col] === gameState.turn;
         }
         
-        // セル選択
+        // 初心者モード切り替え
+        function toggleBeginnerMode() {
+            gameState.beginnerMode = !gameState.beginnerMode;
+            const toggle = document.getElementById('beginnerToggle');
+            
+            if (gameState.beginnerMode) {
+                toggle.textContent = '🎓 初心者モードON';
+                toggle.style.background = 'linear-gradient(135deg, #e74c3c 0%, #c0392b 100%)';
+                showNotification('初心者モードON：駒の動きを詳しく表示します', 'info');
+                
+                // 初心者向けガイドを表示
+                showBeginnerGuide();
+            } else {
+                toggle.textContent = '🎓 初心者モード';
+                toggle.style.background = 'linear-gradient(135deg, #27ae60 0%, #16a085 100%)';
+                showNotification('初心者モードOFF', 'info');
+                
+                // ガイドを非表示
+                hideBeginnerGuide();
+            }
+        }
+        
+        // 初心者向けガイド表示
+        function showBeginnerGuide() {
+            let guideDiv = document.getElementById('beginnerGuide');
+            if (!guideDiv) {
+                guideDiv = document.createElement('div');
+                guideDiv.id = 'beginnerGuide';
+                guideDiv.className = 'beginner-mode';
+                document.querySelector('.game-container').insertBefore(guideDiv, document.querySelector('.board-container'));
+            }
+            
+            guideDiv.innerHTML = `
+                <h4>🎓 初心者ガイド</h4>
+                <p><strong>基本操作:</strong></p>
+                <ul>
+                    <li>駒をクリック → 動ける場所が<span style="color: #3498db;">青</span>で表示</li>
+                    <li>相手の駒は<span style="color: #e74c3c;">赤</span>で表示（取れる駒）</li>
+                    <li>「駒の動き」タブで各駒の動き方を確認</li>
+                    <li>駒台の駒をクリックして好きな場所に打てます</li>
+                </ul>
+                <p><strong>現在の手番:</strong> ${gameState.turn === 'sente' ? '先手（あなた）' : '後手'}の番です</p>
+            `;
+            guideDiv.style.display = 'block';
+        }
+        
+        // 初心者向けガイド非表示
+        function hideBeginnerGuide() {
+            const guideDiv = document.getElementById('beginnerGuide');
+            if (guideDiv) {
+                guideDiv.style.display = 'none';
+            }
+        }
+        
+        // セル選択（初心者モード対応）
         function selectCell(row, col) {
             clearSelection();
             gameState.selectedCell = [row, col];
@@ -1012,9 +1422,18 @@
             cell.classList.add('selected');
             
             highlightPossibleMoves(row, col);
+            
+            // 初心者モードでは駒の説明を表示
+            if (gameState.beginnerMode) {
+                const piece = gameState.board[row][col];
+                const detail = pieceDetails[piece];
+                if (detail) {
+                    showNotification(`${piece}: ${detail.movement}`, 'info');
+                }
+            }
         }
         
-        // 選択クリア
+        // 選択クリア（マーカー削除付き）
         function clearSelection() {
             gameState.selectedCell = null;
             gameState.dropMode = false;
@@ -1022,6 +1441,13 @@
             
             document.querySelectorAll('.cell').forEach(cell => {
                 cell.classList.remove('selected', 'possible-move', 'enemy-piece');
+                cell.style.boxShadow = '';
+                
+                // 移動マーカーを削除
+                const marker = cell.querySelector('.move-marker');
+                if (marker) {
+                    marker.remove();
+                }
             });
             
             document.querySelectorAll('.captured-piece').forEach(piece => {
@@ -1029,21 +1455,53 @@
             });
         }
         
-        // 可能な移動先をハイライト
+        // 可能な移動先をハイライト（強化版）
         function highlightPossibleMoves(row, col) {
             const piece = gameState.board[row][col];
             if (!piece) return;
+            
+            let moveCount = 0;
             
             for (let r = 0; r < 9; r++) {
                 for (let c = 0; c < 9; c++) {
                     if (isValidMove(row, col, r, c)) {
                         const cell = document.querySelector(`[data-row="${r}"][data-col="${c}"]`);
+                        
                         if (gameState.board[r][c]) {
+                            // 相手の駒がある場合
                             cell.classList.add('enemy-piece');
+                            // 駒の価値に応じてエフェクトを変える
+                            const enemyPiece = gameState.board[r][c];
+                            if (pieceValues[enemyPiece] >= 600) {
+                                cell.style.boxShadow = 'inset 0 0 10px #e74c3c';
+                            }
                         } else {
+                            // 空のマスの場合
                             cell.classList.add('possible-move');
+                            
+                            // 移動先にマーカーを追加
+                            if (!cell.querySelector('.move-marker')) {
+                                const marker = document.createElement('div');
+                                marker.className = 'move-marker';
+                                marker.textContent = '●';
+                                cell.appendChild(marker);
+                            }
                         }
+                        moveCount++;
                     }
+                }
+            }
+            
+            // 移動可能な手数を表示
+            if (moveCount > 0) {
+                showNotification(`${piece}: ${moveCount}箇所に移動可能`, 'info');
+                
+                // 選択した駒の説明を簡単に表示
+                const detail = pieceDetails[piece];
+                if (detail) {
+                    setTimeout(() => {
+                        showNotification(`💡 ${detail.movement}`, 'info');
+                    }, 2000);
                 }
             }
         }
@@ -1775,7 +2233,7 @@
             updateMoveDisplay();
         }
         
-        // 表示更新
+        // 表示更新（初心者ガイド対応）
         function updateDisplay() {
             const turnIndicator = document.getElementById('turnIndicator');
             const gameModeIndicator = document.getElementById('gameModeIndicator');
@@ -1804,6 +2262,11 @@
             
             updateCapturedPieces();
             updateGameStats();
+            
+            // 初心者モードのガイドを更新
+            if (gameState.beginnerMode) {
+                showBeginnerGuide();
+            }
         }
         
         // 持ち駒表示更新
@@ -1984,7 +2447,7 @@
             updateGameStats();
         }
         
-        // タブ切り替え
+        // タブ切り替え（駒の動きタブ対応）
         function switchTab(tabName) {
             document.querySelectorAll('.info-tab').forEach(tab => {
                 tab.classList.remove('active');
@@ -1996,7 +2459,10 @@
             event.target.classList.add('active');
             document.getElementById(`${tabName}Content`).classList.add('active');
             
-            if (tabName === 'joseki') {
+            if (tabName === 'help') {
+                // 駒の動きタブが選択された場合の処理
+                updateGameStats(); // 統計も更新
+            } else if (tabName === 'joseki') {
                 updateJosekiDisplay();
             } else if (tabName === 'analysis') {
                 updateAnalysisDisplay();
@@ -2122,15 +2588,17 @@
             }, 500);
         }
         
-        // モーダルクローズ
+        // モーダルクローズ（駒詳細モーダル対応）
         function closeModal() {
             const gameOverModal = document.getElementById('gameOverModal');
             const promotionModal = document.getElementById('promotionModal');
             const gameSetupModal = document.getElementById('gameSetupModal');
+            const pieceDetailModal = document.getElementById('pieceDetailModal');
             
             gameOverModal.classList.remove('show');
             promotionModal.classList.remove('show');
             gameSetupModal.classList.remove('show');
+            pieceDetailModal.classList.remove('show');
         }
         
         // 待った

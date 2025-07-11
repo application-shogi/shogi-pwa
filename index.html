@@ -385,10 +385,38 @@
             animation: pulse-marker 1.5s infinite;
         }
         
+        .piece-help-card {
+            background: #f8f9fa;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            padding: 10px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .piece-help-card:hover {
+            border-color: #8a5536;
+            background: #fff;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        
         @keyframes pulse-marker {
             0% { opacity: 0.6; transform: translate(-50%, -50%) scale(1); }
             50% { opacity: 1; transform: translate(-50%, -50%) scale(1.2); }
             100% { opacity: 0.6; transform: translate(-50%, -50%) scale(1); }
+        }
+        
+        @keyframes slideInRight {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
         }
         
         @media (max-width: 600px) {
@@ -473,7 +501,57 @@
             
             <div class="info-content" id="helpContent">
                 <h4>🎓 駒の動き方ガイド</h4>
-                <p>各駒をクリックすると、動ける場所が青色でハイライトされます。</p>
+                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin: 15px 0;">
+                    <div class="piece-help-card" onclick="showPieceHelp('王')">
+                        <div style="font-size: 1.5rem; font-weight: bold; color: #8a5536; margin-bottom: 5px;">王</div>
+                        <div style="font-weight: bold; margin-bottom: 3px;">王将</div>
+                        <div style="font-size: 0.85rem; color: #666;">全方向に1マス</div>
+                    </div>
+                    <div class="piece-help-card" onclick="showPieceHelp('飛')">
+                        <div style="font-size: 1.5rem; font-weight: bold; color: #8a5536; margin-bottom: 5px;">飛</div>
+                        <div style="font-weight: bold; margin-bottom: 3px;">飛車</div>
+                        <div style="font-size: 0.85rem; color: #666;">縦横に無限</div>
+                    </div>
+                    <div class="piece-help-card" onclick="showPieceHelp('角')">
+                        <div style="font-size: 1.5rem; font-weight: bold; color: #8a5536; margin-bottom: 5px;">角</div>
+                        <div style="font-weight: bold; margin-bottom: 3px;">角行</div>
+                        <div style="font-size: 0.85rem; color: #666;">斜めに無限</div>
+                    </div>
+                    <div class="piece-help-card" onclick="showPieceHelp('金')">
+                        <div style="font-size: 1.5rem; font-weight: bold; color: #8a5536; margin-bottom: 5px;">金</div>
+                        <div style="font-weight: bold; margin-bottom: 3px;">金将</div>
+                        <div style="font-size: 0.85rem; color: #666;">前後左右と斜め前</div>
+                    </div>
+                    <div class="piece-help-card" onclick="showPieceHelp('銀')">
+                        <div style="font-size: 1.5rem; font-weight: bold; color: #8a5536; margin-bottom: 5px;">銀</div>
+                        <div style="font-weight: bold; margin-bottom: 3px;">銀将</div>
+                        <div style="font-size: 0.85rem; color: #666;">前と斜め</div>
+                    </div>
+                    <div class="piece-help-card" onclick="showPieceHelp('桂')">
+                        <div style="font-size: 1.5rem; font-weight: bold; color: #8a5536; margin-bottom: 5px;">桂</div>
+                        <div style="font-weight: bold; margin-bottom: 3px;">桂馬</div>
+                        <div style="font-size: 0.85rem; color: #666;">前に2つ進んで左右</div>
+                    </div>
+                    <div class="piece-help-card" onclick="showPieceHelp('香')">
+                        <div style="font-size: 1.5rem; font-weight: bold; color: #8a5536; margin-bottom: 5px;">香</div>
+                        <div style="font-weight: bold; margin-bottom: 3px;">香車</div>
+                        <div style="font-size: 0.85rem; color: #666;">前方に無限</div>
+                    </div>
+                    <div class="piece-help-card" onclick="showPieceHelp('歩')">
+                        <div style="font-size: 1.5rem; font-weight: bold; color: #8a5536; margin-bottom: 5px;">歩</div>
+                        <div style="font-weight: bold; margin-bottom: 3px;">歩兵</div>
+                        <div style="font-size: 0.85rem; color: #666;">前に1マス</div>
+                    </div>
+                </div>
+                <div style="background: #e8f5e8; padding: 15px; border-radius: 8px; margin-top: 15px;">
+                    <h5 style="margin: 0 0 10px 0; color: #27ae60;">💡 初心者向けのコツ</h5>
+                    <ul style="margin: 0; padding-left: 20px;">
+                        <li style="margin: 5px 0;">駒を選択すると動ける場所が青でハイライト</li>
+                        <li style="margin: 5px 0;">相手の駒は赤で表示（取れる駒）</li>
+                        <li style="margin: 5px 0;">初心者モードONで詳しい説明が表示されます</li>
+                        <li style="margin: 5px 0;">駒台の駒は好きな場所に打てます</li>
+                    </ul>
+                </div>
             </div>
             
             <div class="info-content" id="josekiContent">
@@ -571,6 +649,18 @@
             '飛': '龍'
         };
         
+        // 駒の詳細情報
+        const pieceDetails = {
+            '王': { name: '王将', description: '将棋で最も重要な駒。全方向に1マスずつ動けます。', movement: '全方向（8方向）に1マス' },
+            '飛': { name: '飛車', description: '非常に強力な駒。縦横に何マスでも進めます。', movement: '縦と横の方向に無限' },
+            '角': { name: '角行', description: '斜めに長距離移動できる強力な駒。', movement: '斜めの方向に無限' },
+            '金': { name: '金将', description: '王の近くを守るのに適した駒。', movement: '前、左、右、後ろ、斜め前2方向に1マス' },
+            '銀': { name: '銀将', description: '攻撃的な動きができる駒。', movement: '前、斜め前2方向、斜め後ろ2方向に1マス' },
+            '桂': { name: '桂馬', description: '独特な動きをする駒。他の駒を飛び越えられます。', movement: '前に2マス進んで、左右どちらかに1マス' },
+            '香': { name: '香車', description: '前方にまっすぐ進む駒。', movement: '前方に無限' },
+            '歩': { name: '歩兵', description: '最も基本的な駒。', movement: '前に1マス' }
+        };
+        
         // 猫モードデータ
         const catData = {
             '王': { emoji: '👑🐱', name: '王様猫' },
@@ -626,13 +716,15 @@
                     cell.className = 'cell';
                     cell.dataset.row = row;
                     cell.dataset.col = col;
-                    cell.addEventListener('click', () => handleCellClick(row, col));
+                    cell.addEventListener('click', function() {
+                        handleCellClick(row, col);
+                    });
                     
                     const piece = gameState.board[row][col];
                     if (piece) {
                         const pieceElement = document.createElement('div');
                         const owner = gameState.pieceOwners ? gameState.pieceOwners[row][col] : (row < 3 ? 'gote' : 'sente');
-                        pieceElement.className = `piece ${owner}`;
+                        pieceElement.className = 'piece ' + owner;
                         
                         if (gameState.catMode && catData[piece]) {
                             pieceElement.innerHTML = catData[piece].emoji;
@@ -656,7 +748,8 @@
             if (gameState.gameOver) return;
             
             if (gameState.selectedCell) {
-                const [selectedRow, selectedCol] = gameState.selectedCell;
+                const selectedRow = gameState.selectedCell[0];
+                const selectedCol = gameState.selectedCell[1];
                 
                 if (row === selectedRow && col === selectedCol) {
                     clearSelection();
@@ -688,35 +781,86 @@
             clearSelection();
             gameState.selectedCell = [row, col];
             
-            const cell = document.querySelector(`[data-row="${row}"][data-col="${col}"]`);
+            const cellSelector = '[data-row="' + row + '"][data-col="' + col + '"]';
+            const cell = document.querySelector(cellSelector);
             cell.classList.add('selected');
             
             highlightPossibleMoves(row, col);
+            
+            // 初心者モードでは駒の説明を表示
+            if (gameState.beginnerMode) {
+                const piece = gameState.board[row][col];
+                const detail = pieceDetails[piece];
+                if (detail) {
+                    showNotification(piece + '（' + detail.name + '）: ' + detail.movement, 'info');
+                    
+                    // 詳細な説明を少し遅れて表示
+                    setTimeout(function() {
+                        showNotification('💡 ' + detail.description, 'info');
+                    }, 2000);
+                }
+            }
         }
         
         // 選択クリア
         function clearSelection() {
             gameState.selectedCell = null;
             
-            document.querySelectorAll('.cell').forEach(cell => {
+            document.querySelectorAll('.cell').forEach(function(cell) {
                 cell.classList.remove('selected', 'possible-move', 'enemy-piece');
+                
+                // 移動マーカーを削除
+                const marker = cell.querySelector('.move-marker');
+                if (marker) {
+                    marker.remove();
+                }
             });
         }
         
         // 可能な移動先をハイライト
         function highlightPossibleMoves(row, col) {
+            const piece = gameState.board[row][col];
+            if (!piece) return;
+            
+            let moveCount = 0;
+            
             for (let r = 0; r < 9; r++) {
                 for (let c = 0; c < 9; c++) {
                     if (isValidMove(row, col, r, c)) {
-                        const cell = document.querySelector(`[data-row="${r}"][data-col="${c}"]`);
+                        const cellSelector = '[data-row="' + r + '"][data-col="' + c + '"]';
+                        const cell = document.querySelector(cellSelector);
                         
                         if (gameState.board[r][c]) {
                             cell.classList.add('enemy-piece');
+                            // 初心者モードでは攻撃マークを追加
+                            if (gameState.beginnerMode) {
+                                addMoveMarker(cell, '⚔️');
+                            }
                         } else {
                             cell.classList.add('possible-move');
+                            // 初心者モードでは移動マークを追加
+                            if (gameState.beginnerMode) {
+                                addMoveMarker(cell, '●');
+                            }
                         }
+                        moveCount++;
                     }
                 }
+            }
+            
+            // 初心者モードでは移動可能な手数を表示
+            if (gameState.beginnerMode && moveCount > 0) {
+                showNotification(piece + ': ' + moveCount + '箇所に移動可能', 'info');
+            }
+        }
+        
+        // 移動マーカーを追加
+        function addMoveMarker(cell, symbol) {
+            if (!cell.querySelector('.move-marker')) {
+                const marker = document.createElement('div');
+                marker.className = 'move-marker';
+                marker.textContent = symbol;
+                cell.appendChild(marker);
             }
         }
         
@@ -744,7 +888,12 @@
             const actualRowDiff = owner === 'sente' ? rowDiff : -rowDiff;
             
             if (Array.isArray(pattern)) {
-                return pattern.some(([dr, dc]) => dr === actualRowDiff && dc === colDiff);
+                for (let i = 0; i < pattern.length; i++) {
+                    if (pattern[i][0] === actualRowDiff && pattern[i][1] === colDiff) {
+                        return true;
+                    }
+                }
+                return false;
             }
             
             // 簡略化された線移動チェック
@@ -775,8 +924,8 @@
             gameState.pieceOwners[fromRow][fromCol] = null;
             
             gameState.moveHistory.push({
-                from: `${fromRow}${fromCol}`,
-                to: `${toRow}${toCol}`,
+                from: fromRow + '' + fromCol,
+                to: toRow + '' + toCol,
                 piece: piece,
                 captured: capturedPiece
             });
@@ -791,11 +940,16 @@
         function updateDisplay() {
             const turnIndicator = document.getElementById('turnIndicator');
             const currentPlayer = gameState.turn === 'sente' ? '先手' : '後手';
-            turnIndicator.textContent = `${currentPlayer}の番`;
+            turnIndicator.textContent = currentPlayer + 'の番';
             
             document.getElementById('moveCount').textContent = gameState.moveHistory.length;
             
             updateCapturedPieces();
+            
+            // 初心者モードのガイドを更新
+            if (gameState.beginnerMode) {
+                showBeginnerGuide();
+            }
         }
         
         // 持ち駒表示更新
@@ -806,19 +960,21 @@
             senteDiv.innerHTML = '';
             goteDiv.innerHTML = '';
             
-            gameState.capturedPieces.sente.forEach(piece => {
+            for (let i = 0; i < gameState.capturedPieces.sente.length; i++) {
+                const piece = gameState.capturedPieces.sente[i];
                 const pieceElement = document.createElement('div');
                 pieceElement.className = 'captured-piece';
                 pieceElement.textContent = piece;
                 senteDiv.appendChild(pieceElement);
-            });
+            }
             
-            gameState.capturedPieces.gote.forEach(piece => {
+            for (let i = 0; i < gameState.capturedPieces.gote.length; i++) {
+                const piece = gameState.capturedPieces.gote[i];
                 const pieceElement = document.createElement('div');
                 pieceElement.className = 'captured-piece';
                 pieceElement.textContent = piece;
                 goteDiv.appendChild(pieceElement);
-            });
+            }
         }
         
         // 手順表示更新
@@ -826,42 +982,18 @@
             const historyDiv = document.getElementById('moveHistory');
             historyDiv.innerHTML = '';
             
-            gameState.moveHistory.forEach((move, index) => {
+            for (let i = 0; i < gameState.moveHistory.length; i++) {
+                const move = gameState.moveHistory[i];
                 const moveElement = document.createElement('div');
-                let moveText = `${index + 1}. ${move.piece}${move.from}→${move.to}`;
+                let moveText = (i + 1) + '. ' + move.piece + move.from + '→' + move.to;
                 if (move.captured) {
-                    moveText += `(${move.captured})`;
+                    moveText += '(' + move.captured + ')';
                 }
                 moveElement.textContent = moveText;
                 historyDiv.appendChild(moveElement);
-            });
+            }
             
             historyDiv.scrollTop = historyDiv.scrollHeight;
-        }
-        
-        // タブ切り替え
-        function switchTab(tabName) {
-            document.querySelectorAll('.info-tab').forEach(tab => {
-                tab.classList.remove('active');
-            });
-            document.querySelectorAll('.info-content').forEach(content => {
-                content.classList.remove('active');
-            });
-            
-            event.target.classList.add('active');
-            document.getElementById(`${tabName}Content`).classList.add('active');
-        }
-        
-        // 猫モード切り替え
-        function toggleCatMode() {
-            gameState.catMode = !gameState.catMode;
-            
-            const button = document.querySelector('.cat-mode-button');
-            button.textContent = gameState.catMode ? '🐱 猫モードON' : '🐱 猫モード';
-            button.classList.toggle('active', gameState.catMode);
-            
-            initBoard();
-            showNotification(gameState.catMode ? '🐱 にゃーん！猫モードON！' : '通常モードに戻りました');
         }
         
         // 初心者モード切り替え
@@ -872,12 +1004,84 @@
             if (gameState.beginnerMode) {
                 toggle.textContent = '🎓 初心者モードON';
                 toggle.style.background = 'linear-gradient(135deg, #e74c3c 0%, #c0392b 100%)';
+                showNotification('初心者モードON：駒の動きを詳しく表示します', 'info');
+                showBeginnerGuide();
             } else {
                 toggle.textContent = '🎓 初心者モード';
                 toggle.style.background = 'linear-gradient(135deg, #27ae60 0%, #16a085 100%)';
+                showNotification('初心者モードOFF', 'info');
+                hideBeginnerGuide();
+            }
+        }
+        
+        // 初心者向けガイド表示
+        function showBeginnerGuide() {
+            let guideDiv = document.getElementById('beginnerGuide');
+            if (!guideDiv) {
+                guideDiv = document.createElement('div');
+                guideDiv.id = 'beginnerGuide';
+                guideDiv.style.cssText = 'background: #e8f5e8; padding: 15px; border-radius: 8px; margin: 10px 0; border-left: 4px solid #27ae60;';
+                document.querySelector('.game-container').insertBefore(guideDiv, document.querySelector('.board-container'));
             }
             
-            showNotification(gameState.beginnerMode ? '初心者モードON' : '初心者モードOFF');
+            const currentTurn = gameState.turn === 'sente' ? '先手（下側）' : '後手（上側）';
+            
+            guideDiv.innerHTML = '<h4>🎓 初心者ガイド</h4>' +
+                '<p><strong>基本操作:</strong></p>' +
+                '<ul style="margin-left: 20px;">' +
+                '<li>駒をクリック → 動ける場所が<span style="color: #3498db;">青</span>で表示</li>' +
+                '<li>相手の駒は<span style="color: #e74c3c;">赤</span>で表示（取れる駒）</li>' +
+                '<li>駒台の駒をクリックして好きな場所に打てます</li>' +
+                '<li>駒を選択すると動き方の説明が表示されます</li>' +
+                '</ul>' +
+                '<p><strong>現在の手番:</strong> ' + currentTurn + 'の番です</p>';
+            
+            guideDiv.style.display = 'block';
+        }
+        
+        // 初心者向けガイド非表示
+        function hideBeginnerGuide() {
+            const guideDiv = document.getElementById('beginnerGuide');
+            if (guideDiv) {
+                guideDiv.style.display = 'none';
+            }
+        }
+        
+        // タブ切り替え
+        function switchTab(tabName) {
+            document.querySelectorAll('.info-tab').forEach(function(tab) {
+                tab.classList.remove('active');
+            });
+            document.querySelectorAll('.info-content').forEach(function(content) {
+                content.classList.remove('active');
+            });
+            
+            event.target.classList.add('active');
+            document.getElementById(tabName + 'Content').classList.add('active');
+        }
+        
+        // 駒のヘルプ表示
+        function showPieceHelp(piece) {
+            const detail = pieceDetails[piece];
+            if (detail) {
+                showNotification(piece + '（' + detail.name + '）: ' + detail.description + ' 動き方: ' + detail.movement, 'info');
+            }
+        }
+        
+        // 猫モード切り替え
+        function toggleCatMode() {
+            gameState.catMode = !gameState.catMode;
+            
+            const button = document.querySelector('.cat-mode-button');
+            button.textContent = gameState.catMode ? '🐱 猫モードON' : '🐱 猫モード';
+            if (gameState.catMode) {
+                button.classList.add('active');
+            } else {
+                button.classList.remove('active');
+            }
+            
+            initBoard();
+            showNotification(gameState.catMode ? '🐱 にゃーん！猫モードON！' : '通常モードに戻りました');
         }
         
         // その他の関数（簡略版）
@@ -897,7 +1101,7 @@
                 gameOver: false,
                 pieceOwners: null,
                 isAIMode: gameMode === 'ai',
-                beginnerMode: false,
+                beginnerMode: gameState.beginnerMode,
                 catMode: gameState.catMode
             };
             
@@ -932,31 +1136,59 @@
         }
         
         function closeModal() {
-            document.querySelectorAll('.modal').forEach(modal => {
+            document.querySelectorAll('.modal').forEach(function(modal) {
                 modal.classList.remove('show');
             });
         }
         
         // 通知表示
-        function showNotification(message) {
+        function showNotification(message, type) {
+            if (!type) type = 'info';
+            
+            // 既存の通知を削除
+            const existingNotification = document.querySelector('.game-notification');
+            if (existingNotification) {
+                existingNotification.remove();
+            }
+            
             const notification = document.createElement('div');
-            notification.style.cssText = `
-                position: fixed;
-                top: 20px;
-                right: 20px;
-                background: #3498db;
-                color: white;
-                padding: 15px 20px;
-                border-radius: 8px;
-                z-index: 2000;
-                font-weight: bold;
-            `;
+            notification.className = 'game-notification';
+            
+            let backgroundColor;
+            if (type === 'error') {
+                backgroundColor = '#e74c3c';
+            } else if (type === 'warning') {
+                backgroundColor = '#f39c12';
+            } else {
+                backgroundColor = '#3498db';
+            }
+            
+            notification.style.cssText = 
+                'position: fixed;' +
+                'top: 20px;' +
+                'right: 20px;' +
+                'background: ' + backgroundColor + ';' +
+                'color: white;' +
+                'padding: 15px 20px;' +
+                'border-radius: 8px;' +
+                'z-index: 2000;' +
+                'font-weight: bold;' +
+                'box-shadow: 0 4px 12px rgba(0,0,0,0.3);' +
+                'max-width: 300px;' +
+                'word-wrap: break-word;' +
+                'animation: slideInRight 0.3s ease-out;';
+            
             notification.textContent = message;
             document.body.appendChild(notification);
             
-            setTimeout(() => {
+            setTimeout(function() {
                 if (notification.parentNode) {
-                    notification.parentNode.removeChild(notification);
+                    notification.style.animation = 'slideInRight 0.3s ease-out reverse';
+                    setTimeout(function() {
+                        if (notification.parentNode) {
+                            notification.parentNode.removeChild(notification);
+                        }
+                    }, 300);
                 }
             }, 3000);
         }

@@ -63,6 +63,42 @@
             50% { transform: scale(1.05); }
         }
         
+        /* 猫モード用の追加スタイル */
+        .piece img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            transition: all 0.2s ease;
+        }
+
+        .piece img:hover {
+            transform: scale(1.1);
+        }
+
+        .captured-piece img {
+            width: 20px;
+            height: 20px;
+            object-fit: contain;
+        }
+
+        .cat-loading {
+            position: relative;
+        }
+
+        .cat-loading::after {
+            content: "🐱";
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            animation: catLoadingPulse 1s infinite;
+        }
+
+        @keyframes catLoadingPulse {
+            0%, 100% { opacity: 0.5; }
+            50% { opacity: 1; }
+        }
+        
         .header {
             background: linear-gradient(135deg, #8a5536 0%, #b8860b 100%);
             color: white;
@@ -698,22 +734,22 @@
             '歩': { name: '歩兵', description: '最も基本的な駒。', movement: '前に1マス' }
         };
         
-        // 猫モードデータ（成駒も追加）
+        // 猫モードデータ（PNG画像版）
         const catData = {
-            '王': { emoji: '👑🐱', name: '王様猫' },
-            '飛': { emoji: '✈️🐱', name: '飛行猫' },
-            '角': { emoji: '🏹🐱', name: '弓矢猫' },
-            '金': { emoji: '💰🐱', name: '金持ち猫' },
-            '銀': { emoji: '🥈🐱', name: '銀猫' },
-            '桂': { emoji: '🏇🐱', name: '騎士猫' },
-            '香': { emoji: '🌸🐱', name: '香り猫' },
-            '歩': { emoji: '🚶🐱', name: '歩き猫' },
-            'と': { emoji: '🍯🐱', name: 'はちみつ猫' },
-            '龍': { emoji: '🐉🐱', name: 'ドラゴン猫' },
-            '馬': { emoji: '🦄🐱', name: 'ユニコーン猫' },
-            '杏': { emoji: '🌺🐱', name: '花猫' },
-            '圭': { emoji: '⚔️🐱', name: '戦士猫' },
-            '全': { emoji: '💎🐱', name: 'ダイヤ猫' }
+            '王': { image: './images/cats/king-cat.png', name: '王様猫' },
+            '飛': { image: './images/cats/rook-cat.png', name: '飛行猫' },
+            '角': { image: './images/cats/bishop-cat.png', name: '弓矢猫' },
+            '金': { image: './images/cats/gold-cat.png', name: '金持ち猫' },
+            '銀': { image: './images/cats/silver-cat.png', name: '銀猫' },
+            '桂': { image: './images/cats/knight-cat.png', name: '騎士猫' },
+            '香': { image: './images/cats/lance-cat.png', name: '香り猫' },
+            '歩': { image: './images/cats/walk-cat.png', name: '歩き猫' },
+            'と': { image: './images/cats/promoted-pawn-cat.png', name: 'はちみつ猫' },
+            '龍': { image: './images/cats/dragon-cat.png', name: 'ドラゴン猫' },
+            '馬': { image: './images/cats/horse-cat.png', name: 'ユニコーン猫' },
+            '杏': { image: './images/cats/promoted-lance-cat.png', name: '花猫' },
+            '圭': { image: './images/cats/promoted-knight-cat.png', name: '戦士猫' },
+            '全': { image: './images/cats/promoted-silver-cat.png', name: 'ダイヤ猫' }
         };
         
         // ゲーム状態
@@ -749,7 +785,7 @@
             }
         }
         
-        // 盤面初期化
+        // 盤面初期化（猫画像対応版）
         function initBoard() {
             const board = document.getElementById('board');
             board.innerHTML = '';
@@ -775,10 +811,34 @@
                             pieceElement.classList.add('promoted');
                         }
                         
+                        // 猫モードの場合は画像を使用
                         if (gameState.catMode && catData[piece]) {
-                            pieceElement.innerHTML = catData[piece].emoji;
-                            pieceElement.title = catData[piece].name;
-                            pieceElement.style.fontSize = '12px';
+                            const img = document.createElement('img');
+                            img.src = catData[piece].image;
+                            img.alt = catData[piece].name;
+                            img.title = catData[piece].name;
+                            img.style.cssText = 
+                                'width: 100%; ' +
+                                'height: 100%; ' +
+                                'object-fit: contain; ' +
+                                'pointer-events: none; ' +
+                                'image-rendering: -webkit-optimize-contrast; ' +
+                                'image-rendering: pixelated;';
+                            
+                            // 後手の駒は回転
+                            if (owner === 'gote') {
+                                img.style.transform = 'rotate(180deg)';
+                            }
+                            
+                            // 画像読み込みエラーハンドリング
+                            img.onerror = function() {
+                                // 画像が読み込めない場合は駒の文字を表示
+                                pieceElement.innerHTML = '';
+                                pieceElement.textContent = piece;
+                                console.warn('猫画像が読み込めませんでした:', catData[piece].image);
+                            };
+                            
+                            pieceElement.appendChild(img);
                         } else {
                             pieceElement.textContent = piece;
                         }
@@ -803,6 +863,137 @@
             }
             
             updateDisplay();
+        }
+        
+        // 持ち駒表示更新（猫画像対応版）
+        function updateCapturedPieces() {
+            const senteDiv = document.getElementById('senteCaptured');
+            const goteDiv = document.getElementById('goteCaptured');
+            
+            senteDiv.innerHTML = '';
+            goteDiv.innerHTML = '';
+            
+            // 先手の持ち駒
+            for (let i = 0; i < gameState.capturedPieces.sente.length; i++) {
+                const piece = gameState.capturedPieces.sente[i];
+                const pieceElement = document.createElement('div');
+                pieceElement.className = 'captured-piece';
+                
+                if (gameState.catMode && catData[piece]) {
+                    const img = document.createElement('img');
+                    img.src = catData[piece].image;
+                    img.alt = catData[piece].name;
+                    img.title = catData[piece].name;
+                    img.style.cssText = 
+                        'width: 20px; ' +
+                        'height: 20px; ' +
+                        'object-fit: contain; ' +
+                        'pointer-events: none;';
+                    
+                    img.onerror = function() {
+                        pieceElement.innerHTML = '';
+                        pieceElement.textContent = piece;
+                    };
+                    
+                    pieceElement.appendChild(img);
+                } else {
+                    pieceElement.textContent = piece;
+                }
+                
+                senteDiv.appendChild(pieceElement);
+            }
+            
+            // 後手の持ち駒
+            for (let i = 0; i < gameState.capturedPieces.gote.length; i++) {
+                const piece = gameState.capturedPieces.gote[i];
+                const pieceElement = document.createElement('div');
+                pieceElement.className = 'captured-piece';
+                
+                if (gameState.catMode && catData[piece]) {
+                    const img = document.createElement('img');
+                    img.src = catData[piece].image;
+                    img.alt = catData[piece].name;
+                    img.title = catData[piece].name;
+                    img.style.cssText = 
+                        'width: 20px; ' +
+                        'height: 20px; ' +
+                        'object-fit: contain; ' +
+                        'pointer-events: none;';
+                    
+                    img.onerror = function() {
+                        pieceElement.innerHTML = '';
+                        pieceElement.textContent = piece;
+                    };
+                    
+                    pieceElement.appendChild(img);
+                } else {
+                    pieceElement.textContent = piece;
+                }
+                
+                goteDiv.appendChild(pieceElement);
+            }
+        }
+
+        // 画像プリロード機能
+        function preloadCatImages() {
+            const imagePromises = [];
+            
+            Object.values(catData).forEach(cat => {
+                const img = new Image();
+                img.src = cat.image;
+                
+                const promise = new Promise((resolve) => {
+                    img.onload = () => resolve(true);
+                    img.onerror = () => {
+                        console.warn('猫画像のプリロードに失敗:', cat.image);
+                        resolve(false);
+                    };
+                });
+                
+                imagePromises.push(promise);
+            });
+            
+            return Promise.all(imagePromises);
+        }
+
+        // 猫モード切り替え（画像対応版）
+        function toggleCatMode() {
+            if (!gameState.catMode) {
+                // 猫モードをONにする前に画像をプリロード
+                preloadCatImages().then((results) => {
+                    const loadedCount = results.filter(Boolean).length;
+                    const totalCount = results.length;
+                    
+                    if (loadedCount === 0) {
+                        showNotification('🐱 猫画像が見つかりません。通常モードのままです', 'warning');
+                        return;
+                    } else if (loadedCount < totalCount) {
+                        showNotification(`🐱 一部の猫画像が読み込めませんでした (${loadedCount}/${totalCount})`, 'warning');
+                    } else {
+                        showNotification('🐱 にゃーん！全ての猫画像が読み込まれました！', 'info');
+                    }
+                    
+                    gameState.catMode = true;
+                    updateCatModeButton();
+                    initBoard();
+                });
+            } else {
+                gameState.catMode = false;
+                updateCatModeButton();
+                initBoard();
+                showNotification('通常モードに戻りました');
+            }
+        }
+
+        // 猫モードボタンの更新
+        function updateCatModeButton() {
+            const button = document.querySelector('.cat-mode-button');
+            button.textContent = gameState.catMode ? '🐱 猫モードON' : '🐱 猫モード';
+            if (gameState.catMode) {
+                button.classList.add('active');
+            } else {
+                button.classList.remove('active');
+            }
         }
         
         // セルクリック処理
@@ -1636,47 +1827,6 @@
             }
         }
         
-        // 持ち駒表示更新
-        function updateCapturedPieces() {
-            const senteDiv = document.getElementById('senteCaptured');
-            const goteDiv = document.getElementById('goteCaptured');
-            
-            senteDiv.innerHTML = '';
-            goteDiv.innerHTML = '';
-            
-            for (let i = 0; i < gameState.capturedPieces.sente.length; i++) {
-                const piece = gameState.capturedPieces.sente[i];
-                const pieceElement = document.createElement('div');
-                pieceElement.className = 'captured-piece';
-                
-                if (gameState.catMode && catData[piece]) {
-                    pieceElement.innerHTML = catData[piece].emoji;
-                    pieceElement.title = catData[piece].name;
-                    pieceElement.style.fontSize = '10px';
-                } else {
-                    pieceElement.textContent = piece;
-                }
-                
-                senteDiv.appendChild(pieceElement);
-            }
-            
-            for (let i = 0; i < gameState.capturedPieces.gote.length; i++) {
-                const piece = gameState.capturedPieces.gote[i];
-                const pieceElement = document.createElement('div');
-                pieceElement.className = 'captured-piece';
-                
-                if (gameState.catMode && catData[piece]) {
-                    pieceElement.innerHTML = catData[piece].emoji;
-                    pieceElement.title = catData[piece].name;
-                    pieceElement.style.fontSize = '10px';
-                } else {
-                    pieceElement.textContent = piece;
-                }
-                
-                goteDiv.appendChild(pieceElement);
-            }
-        }
-        
         // 手順表示更新
         function updateMoveDisplay() {
             const historyDiv = document.getElementById('moveHistory');
@@ -1788,22 +1938,6 @@
             if (detail) {
                 showNotification(piece + '（' + detail.name + '）: ' + detail.description + ' 動き方: ' + detail.movement, 'info');
             }
-        }
-        
-        // 猫モード切り替え
-        function toggleCatMode() {
-            gameState.catMode = !gameState.catMode;
-            
-            const button = document.querySelector('.cat-mode-button');
-            button.textContent = gameState.catMode ? '🐱 猫モードON' : '🐱 猫モード';
-            if (gameState.catMode) {
-                button.classList.add('active');
-            } else {
-                button.classList.remove('active');
-            }
-            
-            initBoard();
-            showNotification(gameState.catMode ? '🐱 にゃーん！猫モードON！' : '通常モードに戻りました');
         }
         
         // その他の関数

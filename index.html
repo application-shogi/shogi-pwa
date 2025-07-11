@@ -86,12 +86,7 @@
         }
 
         .captured-piece:hover img {
-            transform: scale(1.1);
-        }
-
-        /* 後手の持ち駒のホバー時も回転を維持 */
-        #goteCaptured .captured-piece:hover img {
-            transform: rotate(180deg) scale(1.1);
+            transform: scale(1.1); /* 駒台では回転なし、スケールのみ */
         }
 
         .cat-loading {
@@ -939,23 +934,18 @@
                         'width: 20px; ' +
                         'height: 20px; ' +
                         'object-fit: contain; ' +
-                        'pointer-events: none; ' +
-                        'transform: rotate(180deg);'; // 後手の持ち駒も180度回転
+                        'pointer-events: none;'; // 駒台では回転なし
                     
                     img.onerror = function() {
                         pieceElement.innerHTML = '';
                         pieceElement.textContent = piece;
-                        // 画像エラー時も文字を回転
-                        pieceElement.style.transform = 'rotate(180deg)';
-                        pieceElement.style.color = '#8b0000';
+                        // 画像エラー時も駒台では回転なし
                     };
                     
                     pieceElement.appendChild(img);
                 } else {
                     pieceElement.textContent = piece;
-                    // 通常の文字表示でも後手は回転
-                    pieceElement.style.transform = 'rotate(180deg)';
-                    pieceElement.style.color = '#8b0000';
+                    // 駒台の文字表示でも回転なし
                 }
                 
                 goteDiv.appendChild(pieceElement);

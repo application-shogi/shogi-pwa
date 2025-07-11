@@ -3148,6 +3148,138 @@ setInterval(function() {
 }, 2000); // 2秒ごと
 
 console.log('🐱 猫表示維持機能が読み込まれました！');
+        // 🐱 Step 6: ちらつき防止機能
+
+// 既存のinitBoard関数を拡張（盤面描画時に最初から猫で描画）
+if (typeof initBoard === 'function') {
+    const originalInitBoard = initBoard;
+    window.initBoard = function() {
+        // 元の盤面描画を実行
+        const result = originalInitBoard.call(this);
+        
+        // 猫モードが有効なら、即座に猫表示に変更（遅延なし）
+        if (catModeEnabled) {
+            updateAllPiecesToCat();
+            console.log('🐱 initBoard: 即座に猫表示適用');
+        }
+        
+        return result;
+    };
+}
+
+// 駒要素が作成される瞬間をキャッチして即座に猫にする
+function interceptPieceCreation() {
+    // 駒が追加される瞬間を監視
+    const boardElement = document.querySelector('.board');
+    if (!boardElement) {
+        setTimeout(interceptPieceCreation, 500);
+        return;
+    }
+    
+    const observer = new MutationObserver(function(mutations) {
+        if (!catModeEnabled) return;
+        
+        mutations.forEach(function(mutation) {
+            mutation.addedNodes.forEach(function(node) {
+                if (node.nodeType === Node.ELEMENT_NODE) {
+                    // 新しく追加された駒要素を即座に猫に変換
+                    if (node.classList && node.classList.contains('piece')) {
+                        updateSinglePieceToCat(node);
+                    }
+                    
+                    // 子要素に駒がある場合も対応
+                    const pieces = node.querySelectorAll && node.querySelectorAll('.piece');
+                    if (pieces) {
+                        pieces.forEach(updateSinglePieceToCat);
+                    }
+                }
+            });
+        });
+    });
+    
+    observer.observe(boardElement, {
+        childList: true,
+        subtree: true
+    });
+    
+    console.log('🐱 駒作成時の即座変換機能を開始');
+}
+
+// より速い猫表示更新（遅延を最小化）
+function updateSinglePieceToFastCat(pieceElement) {
+    if (!catModeEnabled) return;
+    
+    const originalText = pieceElement.textContent.trim();
+    const catData = simpleCatData[originalText];
+    
+    if (catData) {
+        // DOM操作を最小化して高速化
+        pieceElement.innerHTML = catData.emoji;
+        pieceElement.setAttribute('data-original-text', originalText);
+        pieceElement.title = `${catData.name} (${originalText})`;
+        pieceElement.style.fontSize = '12px';
+    }
+}
+
+// 既存のupdateAllPiecesToCat関数を高速版に置き換え
+window.updateAllPiecesToCat = function() {
+    const pieces = document.querySelectorAll('.piece');
+    pieces.forEach(updateSinglePieceToFastCat);
+};
+
+// 既存のupdateSinglePieceToCat関数も高速版に置き換え
+window.updateSinglePieceToCat = updateSinglePieceToFastCat;
+
+// makeMove関数の修正版（さらに高速化）
+if (typeof makeMove === 'function') {
+    const originalMakeMove = makeMove;
+    window.makeMove = function(fromRow, fromCol, toRow, toCol, promote = false) {
+        // 猫モードの場合、移動前に準備
+        if (catModeEnabled) {
+            // 移動先のセルを事前に特定
+            const targetCell = document.querySelector(`[data-row="${toRow}"][data-col="${toCol}"]`);
+            if (targetCell) {
+                // 移動直後に即座に適用するためのフラグ
+                targetCell.setAttribute('data-needs-cat-update', 'true');
+            }
+        }
+        
+        // 元の移動処理を実行
+        const result = originalMakeMove.call(this, fromRow, fromCol, toRow, toCol, promote);
+        
+        // 猫モードの場合、即座に更新
+        if (catModeEnabled) {
+            // requestAnimationFrameで次のフレームで即座に実行
+            requestAnimationFrame(() => {
+                updateAllPiecesToCat();
+            });
+        }
+        
+        return result;
+    };
+}
+
+// ページ読み込み時に即座変換機能を開始
+setTimeout(interceptPieceCreation, 100);
+
+// 猫モード切り替え時の改良
+const originalToggleCatMode = toggleCatMode;
+window.toggleCatMode = function() {
+    const wasEnabled = catModeEnabled;
+    
+    // 元の切り替え処理
+    originalToggleCatMode.call(this);
+    
+    // 切り替え直後に即座適用
+    if (catModeEnabled && !wasEnabled) {
+        // ONにした場合、即座に全駒を変換
+        requestAnimationFrame(() => {
+            updateAllPiecesToCat();
+        });
+    }
+};
+
+console.log('🐱 ちらつき防止機能が読み込まれました！');
     </script>
 </body>
 </html>

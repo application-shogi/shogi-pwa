@@ -2908,6 +2908,153 @@
             console.error('未処理のPromise拒否:', e.reason);
             e.preventDefault();
         });
+        // 🐱 猫モードの基本機能 - Step 3
+let catModeEnabled = false;
+
+// 猫駒データ（簡易版）
+const simpleCatData = {
+    '王': { emoji: '👑🐱', name: '王様猫' },
+    '飛': { emoji: '✈️🐱', name: '飛行猫' },
+    '角': { emoji: '🏹🐱', name: '弓矢猫' },
+    '金': { emoji: '💰🐱', name: '金持ち猫' },
+    '銀': { emoji: '🥈🐱', name: '銀猫' },
+    '桂': { emoji: '🏇🐱', name: '騎士猫' },
+    '香': { emoji: '🌸🐱', name: '香り猫' },
+    '歩': { emoji: '🚶🐱', name: '歩き猫' },
+    'と': { emoji: '🍯🐱', name: 'はちみつ猫' },
+    '龍': { emoji: '🐉🐱', name: 'ドラゴン猫' },
+    '馬': { emoji: '🦄🐱', name: 'ユニコーン猫' },
+    '杏': { emoji: '🌺🐱', name: '花猫' },
+    '圭': { emoji: '⚔️🐱', name: '剣猫' },
+    '全': { emoji: '💎🐱', name: 'ダイヤ猫' }
+};
+
+// 猫モード切り替え関数
+function toggleCatMode() {
+    catModeEnabled = !catModeEnabled;
+    
+    // ボタンの表示を更新
+    const button = document.querySelector('.cat-mode-button');
+    if (button) {
+        button.textContent = catModeEnabled ? '🐱 猫モードON' : '🐱 猫モード';
+        button.classList.toggle('active', catModeEnabled);
+    }
+    
+    // 全ての駒を更新
+    updateAllPiecesToCat();
+    
+    // 通知表示
+    showCatNotification(catModeEnabled ? '🐱 にゃーん！猫モードON！' : '🏮 通常モードに戻りました');
+    
+    // 簡易鳴き声
+    if (catModeEnabled) {
+        playCatMeow();
+    }
+}
+
+// 全ての駒を猫モードに更新
+function updateAllPiecesToCat() {
+    const pieces = document.querySelectorAll('.piece');
+    pieces.forEach(piece => {
+        updateSinglePieceToCat(piece);
+    });
+}
+
+// 個別の駒を猫モードに更新
+function updateSinglePieceToCat(pieceElement) {
+    const originalText = pieceElement.getAttribute('data-original-text') || pieceElement.textContent;
+    
+    // 元のテキストを保存
+    if (!pieceElement.getAttribute('data-original-text')) {
+        pieceElement.setAttribute('data-original-text', originalText);
+    }
+    
+    const catData = simpleCatData[originalText];
+    
+    if (catModeEnabled && catData) {
+        // 猫モード: 絵文字表示
+        pieceElement.innerHTML = catData.emoji;
+        pieceElement.title = `${catData.name} (${originalText})`;
+        pieceElement.style.fontSize = '12px';
+    } else {
+        // 通常モード: 元の文字表示
+        pieceElement.textContent = originalText;
+        pieceElement.title = '';
+        pieceElement.style.fontSize = '';
+    }
+}
+
+// 通知表示
+function showCatNotification(message) {
+    // 既存の通知を削除
+    const existing = document.querySelector('.cat-notification');
+    if (existing) {
+        existing.remove();
+    }
+    
+    // 新しい通知を作成
+    const notification = document.createElement('div');
+    notification.className = 'cat-notification';
+    notification.textContent = message;
+    notification.style.cssText = `
+        position: fixed !important;
+        top: 20px !important;
+        left: 50% !important;
+        transform: translateX(-50%) translateY(-100px) !important;
+        background: linear-gradient(135deg, #ff69b4 0%, #ff1493 100%) !important;
+        color: white !important;
+        padding: 10px 20px !important;
+        border-radius: 20px !important;
+        font-weight: bold !important;
+        z-index: 3000 !important;
+        transition: transform 0.3s ease !important;
+        border: 2px solid white !important;
+    `;
+    
+    document.body.appendChild(notification);
+    
+    // アニメーション
+    setTimeout(() => {
+        notification.style.transform = 'translateX(-50%) translateY(0) !important';
+    }, 100);
+    
+    // 3秒後に消去
+    setTimeout(() => {
+        notification.style.transform = 'translateX(-50%) translateY(-100px) !important';
+        setTimeout(() => {
+            if (notification.parentNode) {
+                notification.parentNode.removeChild(notification);
+            }
+        }, 300);
+    }, 3000);
+}
+
+// 簡易猫の鳴き声
+function playCatMeow() {
+    try {
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+        
+        oscillator.type = 'sine';
+        oscillator.frequency.setValueAtTime(400, audioContext.currentTime);
+        oscillator.frequency.exponentialRampToValueAtTime(300, audioContext.currentTime + 0.3);
+        
+        gainNode.gain.setValueAtTime(0, audioContext.currentTime);
+        gainNode.gain.linearRampToValueAtTime(0.1, audioContext.currentTime + 0.05);
+        gainNode.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.3);
+        
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+        
+        oscillator.start(audioContext.currentTime);
+        oscillator.stop(audioContext.currentTime + 0.3);
+    } catch (error) {
+        console.log('鳴き声再生エラー:', error);
+    }
+}
+
+console.log('🐱 猫モード基本機能が読み込まれました！');
     </script>
 </body>
 </html>

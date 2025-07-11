@@ -3055,6 +3055,99 @@ function playCatMeow() {
 }
 
 console.log('🐱 猫モード基本機能が読み込まれました！');
+
+        // 🐱 Step 5: 駒移動後も猫を維持する機能
+
+// 既存のmakeMove関数を拡張
+if (typeof makeMove === 'function') {
+    const originalMakeMove = makeMove;
+    window.makeMove = function(fromRow, fromCol, toRow, toCol, promote = false) {
+        // 元の移動処理を実行
+        const result = originalMakeMove.call(this, fromRow, fromCol, toRow, toCol, promote);
+        
+        // 猫モードが有効なら、少し待ってから駒を猫に戻す
+        if (catModeEnabled) {
+            setTimeout(() => {
+                updateAllPiecesToCat();
+                console.log('🐱 駒移動後、猫表示を復元しました');
+            }, 100);
+        }
+        
+        return result;
+    };
+}
+
+// 盤面の変更を監視して自動的に猫表示を維持
+function startCatModeObserver() {
+    const boardContainer = document.querySelector('.board') || document.querySelector('.board-container');
+    if (!boardContainer) {
+        console.log('🐱 盤面が見つかりません、少し待ってから再試行します');
+        setTimeout(startCatModeObserver, 1000);
+        return;
+    }
+    
+    console.log('🐱 盤面監視開始');
+    
+    const observer = new MutationObserver(function(mutations) {
+        if (!catModeEnabled) return;
+        
+        let needsUpdate = false;
+        
+        mutations.forEach(function(mutation) {
+            // 新しい駒が追加されたり、内容が変更された場合
+            if (mutation.type === 'childList' || mutation.type === 'characterData') {
+                needsUpdate = true;
+            }
+            
+            // 属性が変更された場合
+            if (mutation.type === 'attributes') {
+                needsUpdate = true;
+            }
+        });
+        
+        if (needsUpdate) {
+            // 少し待ってから猫表示を復元
+            setTimeout(() => {
+                updateAllPiecesToCat();
+                console.log('🐱 盤面変更を検知、猫表示を復元しました');
+            }, 50);
+        }
+    });
+    
+    // 盤面全体を監視
+    observer.observe(boardContainer, {
+        childList: true,        // 子要素の追加・削除
+        subtree: true,          // 孫要素も含めて監視
+        characterData: true,    // テキスト内容の変更
+        attributes: true        // 属性の変更
+    });
+    
+    console.log('🐱 盤面監視設定完了！');
+}
+
+// ページ読み込み完了後に監視開始
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('🐱 DOMContentLoaded: 猫モード初期化開始');
+    startCatModeObserver();
+});
+
+// 既にページが読み込まれている場合の対応
+if (document.readyState === 'loading') {
+    // まだ読み込み中
+    document.addEventListener('DOMContentLoaded', startCatModeObserver);
+} else {
+    // 既に読み込み完了
+    setTimeout(startCatModeObserver, 500);
+}
+
+// 定期的に猫表示をチェック（保険）
+setInterval(function() {
+    if (catModeEnabled) {
+        updateAllPiecesToCat();
+    }
+}, 2000); // 2秒ごと
+
+console.log('🐱 猫表示維持機能が読み込まれました！');
     </script>
 </body>
 </html>

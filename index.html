@@ -15,7 +15,38 @@
     <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzIiIGhlaWdodD0iMzIiIHZpZXdCb3g9IjAgMCAzMiAzMiIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMzIiIGhlaWdodD0iMzIiIGZpbGw9IiM4YTU1MzYiLz48dGV4dCB4PSIxNiIgeT0iMjIiIGZpbGw9IiNmZmZmZmYiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZvbnQtc2l6ZT0iMTQiIGZvbnQtZmFtaWx5PSJzYW5zLXNlcmlmIj7lsIY8L3RleHQ+PC9zdmc+" type="image/svg+xml">
     <meta name="theme-color" content="#8a5536">
     <meta name="description" content="AI対戦・定跡・棋力判定機能付きの本格将棋PWAアプリ。オフライン対応、成り・王手・詰み・打ち歩詰め対応、棋譜保存機能付き。">
-   
+
+/* 🐱 猫ボタンのスタイル - Step 1 */
+.cat-mode-button {
+    background: linear-gradient(135deg, #ff69b4 0%, #ff1493 100%) !important;
+    color: white !important;
+    border: none !important;
+    padding: 10px 20px !important;
+    border-radius: 25px !important;
+    cursor: pointer !important;
+    font-size: 14px !important;
+    font-weight: bold !important;
+    transition: all 0.3s ease !important;
+    box-shadow: 0 4px 15px rgba(255, 105, 180, 0.3) !important;
+    margin: 5px !important;
+}
+
+.cat-mode-button:hover {
+    transform: translateY(-2px) scale(1.05) !important;
+    box-shadow: 0 6px 20px rgba(255, 105, 180, 0.4) !important;
+}
+
+.cat-mode-button.active {
+    background: linear-gradient(135deg, #ff1493 0%, #dc143c 100%) !important;
+    animation: catPulse 2s infinite !important;
+}
+
+@keyframes catPulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+}
+
+    
     <style>
         * {
             margin: 0;

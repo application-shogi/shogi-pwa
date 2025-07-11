@@ -75,10 +75,23 @@
             transform: scale(1.1);
         }
 
+        .piece.gote img:hover {
+            transform: rotate(180deg) scale(1.1); /* 後手の画像のホバー時も回転を維持 */
+        }
+
         .captured-piece img {
             width: 20px;
             height: 20px;
             object-fit: contain;
+        }
+
+        .captured-piece:hover img {
+            transform: scale(1.1);
+        }
+
+        /* 後手の持ち駒のホバー時も回転を維持 */
+        #goteCaptured .captured-piece:hover img {
+            transform: rotate(180deg) scale(1.1);
         }
 
         .cat-loading {
@@ -825,9 +838,11 @@
                                 'image-rendering: -webkit-optimize-contrast; ' +
                                 'image-rendering: pixelated;';
                             
-                            // 後手の駒は回転
+                            // 後手の駒は180度回転
                             if (owner === 'gote') {
                                 img.style.transform = 'rotate(180deg)';
+                                // 親要素の回転もリセット（二重回転を防ぐ）
+                                pieceElement.style.transform = 'none';
                             }
                             
                             // 画像読み込みエラーハンドリング
@@ -835,6 +850,10 @@
                                 // 画像が読み込めない場合は駒の文字を表示
                                 pieceElement.innerHTML = '';
                                 pieceElement.textContent = piece;
+                                // 後手の場合は文字も回転
+                                if (owner === 'gote') {
+                                    pieceElement.style.transform = 'rotate(180deg)';
+                                }
                                 console.warn('猫画像が読み込めませんでした:', catData[piece].image);
                             };
                             
@@ -888,16 +907,18 @@
                         'width: 20px; ' +
                         'height: 20px; ' +
                         'object-fit: contain; ' +
-                        'pointer-events: none;';
+                        'pointer-events: none;'; // 先手は回転なし
                     
                     img.onerror = function() {
                         pieceElement.innerHTML = '';
                         pieceElement.textContent = piece;
+                        // 画像エラー時は通常の文字表示
                     };
                     
                     pieceElement.appendChild(img);
                 } else {
                     pieceElement.textContent = piece;
+                    // 先手の通常表示（回転なし）
                 }
                 
                 senteDiv.appendChild(pieceElement);
@@ -918,16 +939,23 @@
                         'width: 20px; ' +
                         'height: 20px; ' +
                         'object-fit: contain; ' +
-                        'pointer-events: none;';
+                        'pointer-events: none; ' +
+                        'transform: rotate(180deg);'; // 後手の持ち駒も180度回転
                     
                     img.onerror = function() {
                         pieceElement.innerHTML = '';
                         pieceElement.textContent = piece;
+                        // 画像エラー時も文字を回転
+                        pieceElement.style.transform = 'rotate(180deg)';
+                        pieceElement.style.color = '#8b0000';
                     };
                     
                     pieceElement.appendChild(img);
                 } else {
                     pieceElement.textContent = piece;
+                    // 通常の文字表示でも後手は回転
+                    pieceElement.style.transform = 'rotate(180deg)';
+                    pieceElement.style.color = '#8b0000';
                 }
                 
                 goteDiv.appendChild(pieceElement);

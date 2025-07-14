@@ -676,7 +676,10 @@
 
         async function joinExistingRoom(roomData, playerName) {
             if (roomData.players.gote !== null) {
-                throw new Error('この部屋は既に満員です');
+                // 部屋が満員の場合、古い部屋をリセットして新しく作成
+                console.log('部屋が満員のため、新しい部屋を作成します');
+                await createRoom(onlineGame.roomPassword, playerName);
+                return;
             }
             
             onlineGame.playerSide = 'gote';
@@ -746,7 +749,7 @@
                     from: { row: fromRow, col: fromCol },
                     to: { row: toRow, col: toCol },
                     player: onlineGame.playerSide,
-                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                    timestamp: Date.now() // serverTimestamp() はarrayUnion内では使用不可
                 };
 
                 await db.collection('rooms').doc(onlineGame.roomPassword).update({
@@ -788,7 +791,7 @@
                     player: onlineGame.playerSide,
                     playerName: onlineGame.playerName,
                     message: message,
-                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                    timestamp: Date.now() // serverTimestamp() はarrayUnion内では使用不可
                 };
 
                 await db.collection('rooms').doc(onlineGame.roomPassword).update({
@@ -892,7 +895,16 @@
             }
             
             const messageDiv = document.createElement('div');
-            const time = new Date().toLocaleTimeString();
+            // timestampがnumberの場合とFirestoreのTimestampの場合に対応
+            const timestamp = message.timestamp;
+            let time;
+            if (typeof timestamp === 'number') {
+                time = new Date(timestamp).toLocaleTimeString();
+            } else if (timestamp && timestamp.toDate) {
+                time = timestamp.toDate().toLocaleTimeString();
+            } else {
+                time = new Date().toLocaleTimeString();
+            }
             
             messageDiv.innerHTML = 
                 '<span style="color: #666; font-size: 10px;">' + time + '</span> ' +

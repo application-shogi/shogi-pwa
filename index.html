@@ -3,6 +3,2194 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>将棋 - CPU対戦・オンライン対戦対応</title>
+    <link rel="manifest" href="./manifest.json">
+    <link rel="apple-touch-icon" href="./icons/icon-192x192.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="./icons/icon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="./icons/icon-16x16.png">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="将棋">
+    <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzIiIGhlaWdodD0iMzIiIHZpZXdCb3g9IjAgMCAzMiAzMiIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMzIiIGhlaWdodD0iMzIiIGZpbGw9IiM4YTU1MzYiLz48dGV4dCB4PSIxNiIgeT0iMjIiIGZpbGw9IiNmZmZmZmYiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZvbnQtc2l6ZT0iMTQiIGZvbnQtZmFtaWx5PSJzYW5zLXNlcmlmIj7lsIY8L3RleHQ+PC9zdmc+" type="image/svg+xml">
+    <meta name="theme-color" content="#8a5536">
+    <meta name="description" content="CPU対戦・オンライン対戦・棋力判定機能付きの本格将棋アプリ。">
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', 'Meiryo', sans-serif;
+            background: linear-gradient(135deg, #f4f1eb 0%, #e8dcc6 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            color: #333;
+            user-select: none;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #8a5536 0%, #b8860b 100%);
+            color: white;
+            padding: 15px 20px;
+            text-align: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .header h1 {
+            font-size: 1.8rem;
+            margin-bottom: 5px;
+        }
+        
+        .game-mode-indicator {
+            font-size: 0.9rem;
+            margin-bottom: 5px;
+            opacity: 0.9;
+        }
+        
+        .turn-indicator {
+            font-size: 1.2rem;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .connection-status {
+            font-size: 0.8rem;
+            margin-bottom: 5px;
+            padding: 3px 8px;
+            border-radius: 12px;
+            display: inline-block;
+        }
+        
+        .connection-status.connected {
+            background: rgba(39, 174, 96, 0.3);
+            color: #27ae60;
+        }
+        
+        .connection-status.disconnected {
+            background: rgba(231, 76, 60, 0.3);
+            color: #e74c3c;
+        }
+        
+        .connection-status.connecting {
+            background: rgba(241, 196, 15, 0.3);
+            color: #f1c40f;
+        }
+        
+        .ai-thinking {
+            color: #3498db;
+            animation: pulse 1.5s infinite;
+        }
+        
+        .check-indicator {
+            color: #ff6b6b;
+            animation: pulse 1s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+        
+        .game-stats {
+            font-size: 0.8rem;
+            opacity: 0.8;
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+        }
+        
+        .game-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+        }
+        
+        .board-container {
+            position: relative;
+            margin: 20px 0;
+        }
+        
+        .board {
+            display: grid;
+            grid-template-columns: repeat(9, 45px);
+            grid-template-rows: repeat(9, 45px);
+            gap: 1px;
+            background: #654321;
+            border: 3px solid #8a5536;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        }
+        
+        .cell {
+            background: #f4d03f;
+            border: 1px solid #8a5536;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s;
+            position: relative;
+        }
+        
+        .cell:hover {
+            background: #f7dc6f;
+        }
+        
+        .cell.selected {
+            background: #85c1e9;
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.3);
+        }
+        
+        .cell.possible-move {
+            background: #aed6f1;
+        }
+        
+        .cell.drop-target {
+            background: #98FB98;
+        }
+        
+        .cell.enemy-piece {
+            background: #f1948a;
+        }
+        
+        .cell.promotion-zone {
+            background: #FFE4B5;
+        }
+        
+        .cell.ai-move-from, .cell.online-move-from {
+            background: #f39c12;
+            animation: highlight 1s ease-out;
+        }
+        
+        .cell.ai-move-to, .cell.online-move-to {
+            background: #e67e22;
+            animation: highlight 1s ease-out;
+        }
+        
+        @keyframes highlight {
+            0% { box-shadow: inset 0 0 0 3px #e74c3c; }
+            100% { box-shadow: inset 0 0 0 0 #e74c3c; }
+        }
+        
+        .piece {
+            color: #000;
+            font-size: 16px;
+            font-weight: bold;
+            text-align: center;
+            line-height: 1;
+        }
+        
+        .piece.sente {
+            color: #000;
+        }
+        
+        .piece.gote {
+            color: #8b0000;
+            transform: rotate(180deg);
+        }
+        
+        .piece.promoted {
+            color: #d4af37;
+        }
+        
+        .captures {
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+            max-width: 600px;
+            margin: 20px 0;
+        }
+        
+        .capture-area {
+            background: rgba(255,255,255,0.8);
+            border: 2px solid #8a5536;
+            border-radius: 10px;
+            padding: 15px;
+            min-height: 100px;
+            width: 45%;
+        }
+        
+        .capture-area h3 {
+            margin-bottom: 10px;
+            color: #8a5536;
+        }
+        
+        .captured-pieces {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+        }
+        
+        .captured-piece {
+            background: #f4d03f;
+            border: 1px solid #8a5536;
+            padding: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+            border-radius: 3px;
+            transition: all 0.2s;
+        }
+        
+        .captured-piece:hover {
+            background: #f7dc6f;
+            transform: translateY(-1px);
+        }
+        
+        .captured-piece.selected {
+            background: #85c1e9;
+            border-color: #3498db;
+            box-shadow: 0 0 5px rgba(52, 152, 219, 0.5);
+        }
+        
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin: 20px 0;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        
+        .button {
+            background: linear-gradient(135deg, #8a5536 0%, #b8860b 100%);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+            position: relative;
+        }
+        
+        .button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+        }
+        
+        .button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        
+        .button.primary {
+            background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+        }
+        
+        .button.success {
+            background: linear-gradient(135deg, #27ae60 0%, #16a085 100%);
+        }
+        
+        .button.danger {
+            background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+        }
+        
+        .button.online-mode {
+            background: linear-gradient(135deg, #9b59b6 0%, #8e44ad 100%);
+        }
+        
+        .button.cat-mode-button {
+            background: linear-gradient(135deg, #ff69b4 0%, #ff1493 100%) !important;
+            color: white !important;
+            border: none !important;
+            padding: 10px 20px !important;
+            border-radius: 25px !important;
+            cursor: pointer !important;
+            font-size: 14px !important;
+            font-weight: bold !important;
+            transition: all 0.3s ease !important;
+            box-shadow: 0 4px 15px rgba(255, 105, 180, 0.3) !important;
+        }
+
+        .button.cat-mode-button:hover {
+            transform: translateY(-2px) scale(1.05) !important;
+            box-shadow: 0 6px 20px rgba(255, 105, 180, 0.4) !important;
+        }
+
+        .button.cat-mode-button.active {
+            background: linear-gradient(135deg, #ff1493 0%, #dc143c 100%) !important;
+            animation: catPulse 2s infinite !important;
+        }
+
+        @keyframes catPulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+        
+        /* 猫モード用の追加スタイル */
+        .piece img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            transition: all 0.2s ease;
+        }
+
+        .piece img:hover {
+            transform: scale(1.1);
+        }
+
+        .piece.gote img:hover {
+            transform: rotate(180deg) scale(1.1); /* 後手の画像のホバー時も回転を維持 */
+        }
+
+        .captured-piece img {
+            width: 20px;
+            height: 20px;
+            object-fit: contain;
+        }
+
+        .captured-piece:hover img {
+            transform: scale(1.1); /* 駒台では回転なし、スケールのみ */
+        }
+
+        .cat-loading {
+            position: relative;
+        }
+
+        .cat-loading::after {
+            content: "🐱";
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            animation: catLoadingPulse 1s infinite;
+        }
+
+        @keyframes catLoadingPulse {
+            0%, 100% { opacity: 0.5; }
+            50% { opacity: 1; }
+        }
+        
+        .game-info {
+            background: rgba(255,255,255,0.9);
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+            max-width: 600px;
+            width: 100%;
+        }
+        
+        .info-tabs {
+            display: flex;
+            margin-bottom: 15px;
+            border-bottom: 2px solid #ddd;
+        }
+        
+        .info-tab {
+            padding: 10px 20px;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: all 0.3s;
+        }
+        
+        .info-tab.active {
+            border-bottom-color: #8a5536;
+            color: #8a5536;
+            font-weight: bold;
+        }
+        
+        .info-content {
+            display: none;
+        }
+        
+        .info-content.active {
+            display: block;
+        }
+        
+        .move-history {
+            max-height: 200px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            padding: 10px;
+            background: white;
+            border-radius: 5px;
+        }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.8);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .modal.show {
+            display: flex;
+        }
+        
+        .modal-content {
+            background: white;
+            padding: 40px;
+            border-radius: 15px;
+            max-width: 500px;
+            width: 90%;
+            text-align: center;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+            animation: modalAppear 0.5s ease-out;
+            position: relative;
+        }
+        
+        @keyframes modalAppear {
+            from {
+                opacity: 0;
+                transform: scale(0.7) translateY(-30px);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1) translateY(0);
+            }
+        }
+        
+        .online-room-section {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+        
+        .room-input {
+            display: flex;
+            gap: 10px;
+            margin: 15px 0;
+            align-items: center;
+        }
+        
+        .room-input input {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        
+        .chat-section {
+            background: rgba(255,255,255,0.1);
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 15px;
+        }
+        
+        .chat-messages {
+            height: 120px;
+            overflow-y: auto;
+            background: rgba(255,255,255,0.1);
+            border-radius: 5px;
+            padding: 10px;
+            margin-bottom: 10px;
+            font-size: 12px;
+        }
+        
+        .chat-input {
+            display: flex;
+            gap: 5px;
+        }
+        
+        .chat-input input {
+            flex: 1;
+            padding: 8px;
+            border: none;
+            border-radius: 3px;
+            font-size: 12px;
+        }
+        
+        .chat-input button {
+            padding: 8px 15px;
+            background: rgba(255,255,255,0.2);
+            border: none;
+            border-radius: 3px;
+            color: white;
+            cursor: pointer;
+        }
+        
+        .piece-help-card {
+            background: #f8f9fa;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            padding: 10px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .piece-help-card:hover {
+            border-color: #8a5536;
+            background: #fff;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        
+        @media (max-width: 600px) {
+            .board {
+                grid-template-columns: repeat(9, 35px);
+                grid-template-rows: repeat(9, 35px);
+            }
+            
+            .cell {
+                font-size: 16px;
+            }
+            
+            .piece {
+                font-size: 12px;
+            }
+            
+            .captures {
+                flex-direction: column;
+                gap: 10px;
+            }
+            
+            .capture-area {
+                width: 100%;
+            }
+            
+            .controls {
+                gap: 5px;
+                flex-wrap: wrap;
+                justify-content: center;
+            }
+            
+            .button {
+                padding: 8px 12px;
+                font-size: 12px;
+                flex: 1;
+                min-width: 80px;
+                max-width: 120px;
+            }
+            
+            /* モバイルでボタンテキストを短縮 */
+            .controls .button:nth-child(1):after { content: "🏠 ローカル"; }
+            .controls .button:nth-child(2):after { content: "💻 CPU"; }
+            .controls .button:nth-child(3):after { content: "🌐 オンライン"; }
+            .controls .button:nth-child(4):after { content: "🎓 初心者"; }
+            .controls .button:nth-child(5):after { content: "🐱 猫"; }
+            .controls .button:nth-child(6):after { content: "💡 ヒント"; }
+            .controls .button:nth-child(7):after { content: "💾 保存"; }
+            
+            .controls .button.cat-mode-button.active:after { content: "🐱 猫ON"; }
+            .controls .button.success:after { content: "🎓 初心者ON"; }
+            
+            .controls .button {
+                text-indent: -9999px;
+                position: relative;
+            }
+            
+            .controls .button:after {
+                position: absolute;
+                left: 50%;
+                top: 50%;
+                transform: translate(-50%, -50%);
+                text-indent: 0;
+                font-size: 11px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="header">
+        <h1>🏯 将棋オンライン</h1>
+        <div class="game-mode-indicator" id="gameModeIndicator">対人戦モード</div>
+        <div class="connection-status disconnected" id="connectionStatus">オフライン</div>
+        <div class="turn-indicator" id="turnIndicator">先手の番</div>
+        <div class="game-stats">
+            <span>手数: <span id="moveCount">0</span></span>
+            <span>勝率: <span id="winRate">-</span></span>
+        </div>
+    </div>
+    
+    <div class="game-container">
+        <!-- オンライン対戦セクション -->
+        <div class="online-room-section" id="onlineSection" style="display: none;">
+            <h3>🌐 オンライン対戦</h3>
+            <div class="room-input">
+                <input type="text" id="roomId" placeholder="ルームID（例：abc123）" maxlength="20">
+                <input type="password" id="roomPassword" placeholder="パスワード" maxlength="20">
+                <button class="button primary" onclick="joinRoom()">参加</button>
+                <button class="button danger" onclick="leaveRoom()" id="leaveRoomBtn" style="display: none;">退室</button>
+            </div>
+            <div style="font-size: 12px; opacity: 0.8;">
+                同じルームIDとパスワードを入力した人同士で対戦できます
+            </div>
+            
+            <div class="chat-section" id="chatSection" style="display: none;">
+                <div class="chat-messages" id="chatMessages"></div>
+                <div class="chat-input">
+                    <input type="text" id="chatInput" placeholder="メッセージを入力..." maxlength="100">
+                    <button onclick="sendChatMessage()">送信</button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="captures">
+            <div class="capture-area">
+                <h3>🔴 後手の駒台</h3>
+                <div class="captured-pieces" id="goteCaptured"></div>
+            </div>
+            <div class="capture-area">
+                <h3>⚫ 先手の駒台</h3>
+                <div class="captured-pieces" id="senteCaptured"></div>
+            </div>
+        </div>
+        
+        <div class="board-container">
+            <div class="board" id="board"></div>
+        </div>
+        
+        <div class="controls">
+            <button class="button success" onclick="startNewGame('human')">🏠 ローカル対戦</button>
+            <button class="button primary" onclick="startNewGame('ai')">💻 CPU対戦</button>
+            <button class="button online-mode" onclick="startNewGame('online')">🌐 オンライン対戦</button>
+            <button class="button" onclick="toggleBeginnerMode()" id="beginnerToggle">🎓 初心者モード</button>
+            <button class="button cat-mode-button" onclick="toggleCatMode()" title="可愛い猫の駒に変更します">🐱 猫モード</button>
+            <button class="button" onclick="getAIHint()" id="hintBtn">💡 ヒント</button>
+            <button class="button" onclick="saveGame()">💾 保存</button>
+        </div>
+        
+        <div class="game-info">
+            <div class="info-tabs">
+                <div class="info-tab active" onclick="switchTab('moves')">棋譜</div>
+                <div class="info-tab" onclick="switchTab('help')">駒の動き</div>
+                <div class="info-tab" onclick="switchTab('analysis')">解析</div>
+            </div>
+            
+            <div class="info-content active" id="movesContent">
+                <div class="move-history" id="moveHistory"></div>
+            </div>
+            
+            <div class="info-content" id="helpContent">
+                <h4>🎓 駒の動き方ガイド</h4>
+                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin: 15px 0;">
+                    <div class="piece-help-card" onclick="showPieceHelp('王')">
+                        <div style="font-size: 1.5rem; font-weight: bold; color: #8a5536; margin-bottom: 5px;">王</div>
+                        <div style="font-weight: bold; margin-bottom: 3px;">王将</div>
+                        <div style="font-size: 0.85rem; color: #666;">全方向に1マス</div>
+                    </div>
+                    <div class="piece-help-card" onclick="showPieceHelp('飛')">
+                        <div style="font-size: 1.5rem; font-weight: bold; color: #8a5536; margin-bottom: 5px;">飛</div>
+                        <div style="font-weight: bold; margin-bottom: 3px;">飛車</div>
+                        <div style="font-size: 0.85rem; color: #666;">縦横に無限</div>
+                    </div>
+                    <div class="piece-help-card" onclick="showPieceHelp('角')">
+                        <div style="font-size: 1.5rem; font-weight: bold; color: #8a5536; margin-bottom: 5px;">角</div>
+                        <div style="font-weight: bold; margin-bottom: 3px;">角行</div>
+                        <div style="font-size: 0.85rem; color: #666;">斜めに無限</div>
+                    </div>
+                    <div class="piece-help-card" onclick="showPieceHelp('金')">
+                        <div style="font-size: 1.5rem; font-weight: bold; color: #8a5536; margin-bottom: 5px;">金</div>
+                        <div style="font-weight: bold; margin-bottom: 3px;">金将</div>
+                        <div style="font-size: 0.85rem; color: #666;">前後左右と斜め前</div>
+                    </div>
+                    <div class="piece-help-card" onclick="showPieceHelp('銀')">
+                        <div style="font-size: 1.5rem; font-weight: bold; color: #8a5536; margin-bottom: 5px;">銀</div>
+                        <div style="font-weight: bold; margin-bottom: 3px;">銀将</div>
+                        <div style="font-size: 0.85rem; color: #666;">前と斜め</div>
+                    </div>
+                    <div class="piece-help-card" onclick="showPieceHelp('桂')">
+                        <div style="font-size: 1.5rem; font-weight: bold; color: #8a5536; margin-bottom: 5px;">桂</div>
+                        <div style="font-weight: bold; margin-bottom: 3px;">桂馬</div>
+                        <div style="font-size: 0.85rem; color: #666;">前に2つ進んで左右</div>
+                    </div>
+                    <div class="piece-help-card" onclick="showPieceHelp('香')">
+                        <div style="font-size: 1.5rem; font-weight: bold; color: #8a5536; margin-bottom: 5px;">香</div>
+                        <div style="font-weight: bold; margin-bottom: 3px;">香車</div>
+                        <div style="font-size: 0.85rem; color: #666;">前方に無限</div>
+                    </div>
+                    <div class="piece-help-card" onclick="showPieceHelp('歩')">
+                        <div style="font-size: 1.5rem; font-weight: bold; color: #8a5536; margin-bottom: 5px;">歩</div>
+                        <div style="font-weight: bold; margin-bottom: 3px;">歩兵</div>
+                        <div style="font-size: 0.85rem; color: #666;">前に1マス</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="info-content" id="analysisContent">
+                <h4>局面解析</h4>
+                <div id="positionAnalysis">
+                    <p>評価値: <span id="evalValue">+0</span></p>
+                    <p>最善手: <span id="bestMove">-</span></p>
+                    <p>読み筋: <span id="principalVariation">-</span></p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+
+    
+    <!-- ゲーム終了モーダル -->
+    <div class="modal" id="gameOverModal">
+        <div class="modal-content">
+            <h2 id="gameOverTitle">ゲーム終了</h2>
+            <p id="gameOverMessage"></p>
+            <button class="button" onclick="closeModal()">閉じる</button>
+            <button class="button success" onclick="startNewGame('human')">新しいローカル対戦</button>
+        </div>
+    </div>
+
+    <!-- 成りの選択モーダル -->
+    <div class="modal" id="promotionModal">
+        <div class="modal-content">
+            <h2>成りますか？</h2>
+            <p>この駒を成らせることができます</p>
+            <div style="margin-top: 30px;">
+                <button class="button success" onclick="confirmPromotion(true)">成る</button>
+                <button class="button" onclick="confirmPromotion(false)">成らない</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 将棋の初期配置
+        const initialBoard = [
+            ['香','桂','銀','金','王','金','銀','桂','香'],
+            ['','飛','','','','','','角',''],
+            ['歩','歩','歩','歩','歩','歩','歩','歩','歩'],
+            ['','','','','','','','',''],
+            ['','','','','','','','',''],
+            ['','','','','','','','',''],
+            ['歩','歩','歩','歩','歩','歩','歩','歩','歩'],
+            ['','角','','','','','','飛',''],
+            ['香','桂','銀','金','王','金','銀','桂','香']
+        ];
+        
+        // 駒の移動パターン
+        const movePatterns = {
+            '王': [[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]],
+            '金': [[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,0]],
+            '銀': [[-1,-1],[-1,0],[-1,1],[1,-1],[1,1]],
+            '桂': [[-2,-1],[-2,1]],
+            '香': 'line_up',
+            '飛': 'cross',
+            '角': 'diagonal',
+            '歩': [[-1,0]],
+            'と': [[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,0]],
+            '杏': [[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,0]],
+            '圭': [[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,0]],
+            '全': [[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,0]],
+            '龍': 'dragon',
+            '馬': 'horse'
+        };
+        
+        // 成駒データ
+        const promotedPieces = {
+            '歩': 'と', '香': '杏', '桂': '圭', '銀': '全', '角': '馬', '飛': '龍'
+        };
+        
+        const originalPieces = {
+            'と': '歩', '杏': '香', '圭': '桂', '全': '銀', '馬': '角', '龍': '飛'
+        };
+        
+        // 駒の詳細情報
+        const pieceDetails = {
+            '王': { name: '王将', description: '将棋で最も重要な駒。全方向に1マスずつ動けます。', movement: '全方向（8方向）に1マス' },
+            '飛': { name: '飛車', description: '非常に強力な駒。縦横に何マスでも進めます。', movement: '縦と横の方向に無限' },
+            '角': { name: '角行', description: '斜めに長距離移動できる強力な駒。', movement: '斜めの方向に無限' },
+            '金': { name: '金将', description: '王の近くを守るのに適した駒。', movement: '前、左、右、後ろ、斜め前2方向に1マス' },
+            '銀': { name: '銀将', description: '攻撃的な動きができる駒。', movement: '前、斜め前2方向、斜め後ろ2方向に1マス' },
+            '桂': { name: '桂馬', description: '独特な動きをする駒。他の駒を飛び越えられます。', movement: '前に2マス進んで、左右どちらかに1マス' },
+            '香': { name: '香車', description: '前方にまっすぐ進む駒。', movement: '前方に無限' },
+            '歩': { name: '歩兵', description: '最も基本的な駒。', movement: '前に1マス' }
+        };
+        
+        // 猫モードデータ（PNG画像版）
+        const catData = {
+            '王': { image: './images/cats/king-cat.png', name: '王様猫' },
+            '飛': { image: './images/cats/rook-cat.png', name: '飛行猫' },
+            '角': { image: './images/cats/bishop-cat.png', name: '弓矢猫' },
+            '金': { image: './images/cats/gold-cat.png', name: '金持ち猫' },
+            '銀': { image: './images/cats/silver-cat.png', name: '銀猫' },
+            '桂': { image: './images/cats/knight-cat.png', name: '騎士猫' },
+            '香': { image: './images/cats/lance-cat.png', name: '香り猫' },
+            '歩': { image: './images/cats/walk-cat.png', name: '歩き猫' },
+            'と': { image: './images/cats/promoted-pawn-cat.png', name: 'はちみつ猫' },
+            '龍': { image: './images/cats/dragon-cat.png', name: 'ドラゴン猫' },
+            '馬': { image: './images/cats/horse-cat.png', name: 'ユニコーン猫' },
+            '杏': { image: './images/cats/promoted-lance-cat.png', name: '花猫' },
+            '圭': { image: './images/cats/promoted-knight-cat.png', name: '戦士猫' },
+            '全': { image: './images/cats/promoted-silver-cat.png', name: 'ダイヤ猫' }
+        };
+        
+        // ゲーム状態
+        let gameState = {
+            board: JSON.parse(JSON.stringify(initialBoard)),
+            turn: 'sente',
+            selectedCell: null,
+            selectedCapturedPiece: null,
+            capturedPieces: { sente: [], gote: [] },
+            moveHistory: [],
+            gameOver: false,
+            pieceOwners: null,
+            isAIMode: false,
+            isOnlineMode: false,
+            beginnerMode: false,
+            catMode: false,
+            pendingPromotion: null,
+            inCheck: false
+        };
+        
+        // オンライン対戦状態
+        let onlineState = {
+            connected: false,
+            roomId: null,
+            isHost: false,
+            playerId: Math.random().toString(36).substr(2, 9),
+            opponentId: null,
+            socket: null
+        };
+        
+        // 初期配置の駒の所有者を設定
+        function initPieceOwners() {
+            gameState.pieceOwners = [];
+            for (let row = 0; row < 9; row++) {
+                gameState.pieceOwners[row] = [];
+                for (let col = 0; col < 9; col++) {
+                    if (gameState.board[row][col] !== '') {
+                        gameState.pieceOwners[row][col] = row <= 2 ? 'gote' : 'sente';
+                    } else {
+                        gameState.pieceOwners[row][col] = null;
+                    }
+                }
+            }
+        }
+        
+        // 盤面初期化（猫画像対応版）
+        function initBoard() {
+            const board = document.getElementById('board');
+            board.innerHTML = '';
+            
+            for (let row = 0; row < 9; row++) {
+                for (let col = 0; col < 9; col++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'cell';
+                    cell.dataset.row = row;
+                    cell.dataset.col = col;
+                    cell.addEventListener('click', function() {
+                        handleCellClick(row, col);
+                    });
+                    
+                    const piece = gameState.board[row][col];
+                    if (piece) {
+                        const pieceElement = document.createElement('div');
+                        const owner = gameState.pieceOwners[row][col];
+                        pieceElement.className = 'piece ' + owner;
+                        
+                        if (originalPieces[piece]) {
+                            pieceElement.classList.add('promoted');
+                        }
+                        
+                        // 猫モードの場合は画像を使用
+                        if (gameState.catMode && catData[piece]) {
+                            const img = document.createElement('img');
+                            img.src = catData[piece].image;
+                            img.alt = catData[piece].name;
+                            img.title = catData[piece].name;
+                            img.style.cssText = 
+                                'width: 100%; ' +
+                                'height: 100%; ' +
+                                'object-fit: contain; ' +
+                                'pointer-events: none; ' +
+                                'image-rendering: -webkit-optimize-contrast; ' +
+                                'image-rendering: pixelated;';
+                            
+                            // 後手の駒は180度回転
+                            if (owner === 'gote') {
+                                img.style.transform = 'rotate(180deg)';
+                                // 親要素の回転もリセット（二重回転を防ぐ）
+                                pieceElement.style.transform = 'none';
+                            }
+                            
+                            // 画像読み込みエラーハンドリング
+                            img.onerror = function() {
+                                // 画像が読み込めない場合は駒の文字を表示
+                                pieceElement.innerHTML = '';
+                                pieceElement.textContent = piece;
+                                // 後手の場合は文字も回転
+                                if (owner === 'gote') {
+                                    pieceElement.style.transform = 'rotate(180deg)';
+                                }
+                                console.warn('猫画像が読み込めませんでした:', catData[piece].image);
+                            };
+                            
+                            pieceElement.appendChild(img);
+                        } else {
+                            pieceElement.textContent = piece;
+                        }
+                        
+                        cell.appendChild(pieceElement);
+                    }
+                    
+                    board.appendChild(cell);
+                }
+            }
+            
+            if (gameState.inCheck) {
+                const kingPos = findKingPosition(gameState.turn);
+                if (kingPos) {
+                    const kingCell = document.querySelector('[data-row="' + kingPos[0] + '"][data-col="' + kingPos[1] + '"]');
+                    if (kingCell) {
+                        kingCell.style.background = '#ff6b6b';
+                        kingCell.style.animation = 'pulse 1s infinite';
+                    }
+                }
+            }
+            
+            updateDisplay();
+        }
+        
+        // 持ち駒表示更新（猫画像対応版）
+        function updateCapturedPieces() {
+            const senteDiv = document.getElementById('senteCaptured');
+            const goteDiv = document.getElementById('goteCaptured');
+            
+            senteDiv.innerHTML = '';
+            goteDiv.innerHTML = '';
+            
+            // 先手の持ち駒
+            for (let i = 0; i < gameState.capturedPieces.sente.length; i++) {
+                const piece = gameState.capturedPieces.sente[i];
+                const pieceElement = document.createElement('div');
+                pieceElement.className = 'captured-piece';
+                
+                if (gameState.catMode && catData[piece]) {
+                    const img = document.createElement('img');
+                    img.src = catData[piece].image;
+                    img.alt = catData[piece].name;
+                    img.title = catData[piece].name;
+                    img.style.cssText = 
+                        'width: 20px; ' +
+                        'height: 20px; ' +
+                        'object-fit: contain; ' +
+                        'pointer-events: none;'; // 先手は回転なし
+                    
+                    img.onerror = function() {
+                        pieceElement.innerHTML = '';
+                        pieceElement.textContent = piece;
+                        // 画像エラー時は通常の文字表示
+                    };
+                    
+                    pieceElement.appendChild(img);
+                } else {
+                    pieceElement.textContent = piece;
+                    // 先手の通常表示（回転なし）
+                }
+                
+                senteDiv.appendChild(pieceElement);
+            }
+            
+            // 後手の持ち駒
+            for (let i = 0; i < gameState.capturedPieces.gote.length; i++) {
+                const piece = gameState.capturedPieces.gote[i];
+                const pieceElement = document.createElement('div');
+                pieceElement.className = 'captured-piece';
+                
+                if (gameState.catMode && catData[piece]) {
+                    const img = document.createElement('img');
+                    img.src = catData[piece].image;
+                    img.alt = catData[piece].name;
+                    img.title = catData[piece].name;
+                    img.style.cssText = 
+                        'width: 20px; ' +
+                        'height: 20px; ' +
+                        'object-fit: contain; ' +
+                        'pointer-events: none;'; // 駒台では回転なし
+                    
+                    img.onerror = function() {
+                        pieceElement.innerHTML = '';
+                        pieceElement.textContent = piece;
+                        // 画像エラー時も駒台では回転なし
+                    };
+                    
+                    pieceElement.appendChild(img);
+                } else {
+                    pieceElement.textContent = piece;
+                    // 駒台の文字表示でも回転なし
+                }
+                
+                goteDiv.appendChild(pieceElement);
+            }
+        }
+        
+        // 画像プリロード機能
+        function preloadCatImages() {
+            const imagePromises = [];
+            
+            Object.values(catData).forEach(cat => {
+                const img = new Image();
+                img.src = cat.image;
+                
+                const promise = new Promise((resolve) => {
+                    img.onload = () => resolve(true);
+                    img.onerror = () => {
+                        console.warn('猫画像のプリロードに失敗:', cat.image);
+                        resolve(false);
+                    };
+                });
+                
+                imagePromises.push(promise);
+            });
+            
+            return Promise.all(imagePromises);
+        }
+
+        // 猫モード切り替え（画像対応版）
+        function toggleCatMode() {
+            if (!gameState.catMode) {
+                // 猫モードをONにする前に画像をプリロード
+                preloadCatImages().then((results) => {
+                    const loadedCount = results.filter(Boolean).length;
+                    const totalCount = results.length;
+                    
+                    if (loadedCount === 0) {
+                        showNotification('🐱 猫画像が見つかりません。通常モードのままです', 'warning');
+                        return;
+                    } else if (loadedCount < totalCount) {
+                        showNotification(`🐱 一部の猫画像が読み込めませんでした (${loadedCount}/${totalCount})`, 'warning');
+                    } else {
+                        showNotification('🐱 にゃーん！全ての猫画像が読み込まれました！', 'info');
+                    }
+                    
+                    gameState.catMode = true;
+                    updateCatModeButton();
+                    initBoard();
+                });
+            } else {
+                gameState.catMode = false;
+                updateCatModeButton();
+                initBoard();
+                showNotification('通常モードに戻りました');
+            }
+        }
+
+        // 猫モードボタンの更新
+        function updateCatModeButton() {
+            const button = document.querySelector('.cat-mode-button');
+            button.textContent = gameState.catMode ? '🐱 猫モードON' : '🐱 猫モード';
+            if (gameState.catMode) {
+                button.classList.add('active');
+            } else {
+                button.classList.remove('active');
+            }
+        }
+        function handleCellClick(row, col) {
+            if (gameState.gameOver) return;
+            
+            // オンラインモードで自分の手番でない場合は無効
+            if (gameState.isOnlineMode && !isMyTurn()) {
+                showNotification('相手の手番です', 'warning');
+                return;
+            }
+            
+            // 駒台から駒を選択している場合
+            if (gameState.selectedCapturedPiece !== null) {
+                if (canDropPiece(row, col)) {
+                    dropPiece(row, col);
+                    gameState.selectedCapturedPiece = null;
+                    clearSelection();
+                    return;
+                } else {
+                    clearSelection();
+                    gameState.selectedCapturedPiece = null;
+                    return;
+                }
+            }
+            
+            if (gameState.selectedCell) {
+                const selectedRow = gameState.selectedCell[0];
+                const selectedCol = gameState.selectedCell[1];
+                
+                if (row === selectedRow && col === selectedCol) {
+                    clearSelection();
+                    return;
+                }
+                
+                if (isValidMove(selectedRow, selectedCol, row, col)) {
+                    makeMove(selectedRow, selectedCol, row, col);
+                    clearSelection();
+                    return;
+                }
+            }
+            
+            const piece = gameState.board[row][col];
+            if (piece && isPieceOwnedByCurrentPlayer(row, col)) {
+                selectCell(row, col);
+            } else {
+                clearSelection();
+            }
+        }
+        
+        // オンラインモードで自分の手番かチェック
+        function isMyTurn() {
+            if (!gameState.isOnlineMode) return true;
+            
+            // ホストは先手、ゲストは後手
+            const myTurn = onlineState.isHost ? 'sente' : 'gote';
+            return gameState.turn === myTurn;
+        }
+        
+        // 駒の所有者判定
+        function isPieceOwnedByCurrentPlayer(row, col) {
+            return gameState.pieceOwners[row][col] === gameState.turn;
+        }
+        
+        // セル選択
+        function selectCell(row, col) {
+            clearSelection();
+            gameState.selectedCell = [row, col];
+            
+            const cellSelector = '[data-row="' + row + '"][data-col="' + col + '"]';
+            const cell = document.querySelector(cellSelector);
+            cell.classList.add('selected');
+            
+            highlightPossibleMoves(row, col);
+            
+            if (gameState.beginnerMode) {
+                const piece = gameState.board[row][col];
+                const detail = pieceDetails[piece];
+                if (detail) {
+                    showNotification(piece + '（' + detail.name + '）: ' + detail.movement, 'info');
+                }
+            }
+        }
+        
+        // 選択クリア
+        function clearSelection() {
+            gameState.selectedCell = null;
+            
+            document.querySelectorAll('.cell').forEach(function(cell) {
+                cell.classList.remove('selected', 'possible-move', 'enemy-piece', 'drop-target', 'promotion-zone');
+            });
+            
+            document.querySelectorAll('.captured-piece').forEach(function(piece) {
+                piece.classList.remove('selected');
+            });
+        }
+        
+        // 可能な移動先をハイライト
+        function highlightPossibleMoves(row, col) {
+            const piece = gameState.board[row][col];
+            if (!piece) return;
+            
+            for (let r = 0; r < 9; r++) {
+                for (let c = 0; c < 9; c++) {
+                    if (isValidMove(row, col, r, c)) {
+                        const cellSelector = '[data-row="' + r + '"][data-col="' + c + '"]';
+                        const cell = document.querySelector(cellSelector);
+                        
+                        if (canPromote(piece, row, r, gameState.turn)) {
+                            cell.classList.add('promotion-zone');
+                        }
+                        
+                        if (gameState.board[r][c]) {
+                            cell.classList.add('enemy-piece');
+                        } else {
+                            cell.classList.add('possible-move');
+                        }
+                    }
+                }
+            }
+        }
+        
+        // 有効な移動かチェック
+        function isValidMove(fromRow, fromCol, toRow, toCol, skipSelfCheck) {
+            if (toRow < 0 || toRow >= 9 || toCol < 0 || toCol >= 9) return false;
+            
+            const piece = gameState.board[fromRow][fromCol];
+            const targetPiece = gameState.board[toRow][toCol];
+            
+            if (targetPiece && gameState.pieceOwners[toRow][toCol] === gameState.pieceOwners[fromRow][fromCol]) return false;
+            
+            if (!checkMovePattern(piece, fromRow, fromCol, toRow, toCol)) return false;
+            
+            if (skipSelfCheck) return true;
+            
+            // 自殺手チェック
+            const owner = gameState.pieceOwners[fromRow][fromCol];
+            const tempPiece = gameState.board[toRow][toCol];
+            const tempOwner = gameState.pieceOwners[toRow][toCol];
+            
+            gameState.board[toRow][toCol] = piece;
+            gameState.board[fromRow][fromCol] = '';
+            gameState.pieceOwners[toRow][toCol] = owner;
+            gameState.pieceOwners[fromRow][fromCol] = null;
+            
+            const wouldBeInCheck = isInCheck(owner);
+            
+            // 元に戻す
+            gameState.board[fromRow][fromCol] = piece;
+            gameState.board[toRow][toCol] = tempPiece;
+            gameState.pieceOwners[fromRow][fromCol] = owner;
+            gameState.pieceOwners[toRow][toCol] = tempOwner;
+            
+            return !wouldBeInCheck;
+        }
+        
+        // 駒の移動パターンチェック
+        function checkMovePattern(piece, fromRow, fromCol, toRow, toCol) {
+            const pattern = movePatterns[piece];
+            if (!pattern) return false;
+            
+            const rowDiff = toRow - fromRow;
+            const colDiff = toCol - fromCol;
+            
+            const owner = gameState.pieceOwners[fromRow][fromCol];
+            const actualRowDiff = owner === 'sente' ? rowDiff : -rowDiff;
+            
+            if (Array.isArray(pattern)) {
+                for (let i = 0; i < pattern.length; i++) {
+                    if (pattern[i][0] === actualRowDiff && pattern[i][1] === colDiff) {
+                        return true;
+                    }
+                }
+                return false;
+            }
+            
+            if (pattern === 'cross') {
+                if (rowDiff === 0 || colDiff === 0) {
+                    return !hasObstacle(fromRow, fromCol, toRow, toCol);
+                }
+            } else if (pattern === 'diagonal') {
+                if (Math.abs(rowDiff) === Math.abs(colDiff)) {
+                    return !hasObstacle(fromRow, fromCol, toRow, toCol);
+                }
+            } else if (pattern === 'line_up') {
+                if (colDiff === 0 && actualRowDiff < 0) {
+                    return !hasObstacle(fromRow, fromCol, toRow, toCol);
+                }
+            } else if (pattern === 'dragon') {
+                if (rowDiff === 0 || colDiff === 0) {
+                    return !hasObstacle(fromRow, fromCol, toRow, toCol);
+                } else if (Math.abs(rowDiff) === 1 && Math.abs(colDiff) === 1) {
+                    return true;
+                }
+            } else if (pattern === 'horse') {
+                if (Math.abs(rowDiff) === Math.abs(colDiff)) {
+                    return !hasObstacle(fromRow, fromCol, toRow, toCol);
+                } else if ((Math.abs(rowDiff) === 1 && colDiff === 0) || (Math.abs(colDiff) === 1 && rowDiff === 0)) {
+                    return true;
+                }
+            }
+            
+            return false;
+        }
+        
+        // 経路上に障害物があるかチェック
+        function hasObstacle(fromRow, fromCol, toRow, toCol) {
+            const rowStep = toRow > fromRow ? 1 : toRow < fromRow ? -1 : 0;
+            const colStep = toCol > fromCol ? 1 : toCol < fromCol ? -1 : 0;
+            
+            let row = fromRow + rowStep;
+            let col = fromCol + colStep;
+            
+            while (row !== toRow || col !== toCol) {
+                if (gameState.board[row][col] !== '') {
+                    return true;
+                }
+                row += rowStep;
+                col += colStep;
+            }
+            
+            return false;
+        }
+        
+        // 成れるかどうかの判定
+        function canPromote(piece, fromRow, toRow, owner) {
+            if (!promotedPieces[piece]) return false;
+            if (originalPieces[piece]) return false;
+            
+            if (owner === 'sente') {
+                return fromRow <= 2 || toRow <= 2;
+            } else {
+                return fromRow >= 6 || toRow >= 6;
+            }
+        }
+        
+        // 駒を移動
+        function makeMove(fromRow, fromCol, toRow, toCol) {
+            const piece = gameState.board[fromRow][fromCol];
+            const capturedPiece = gameState.board[toRow][toCol];
+            
+            if (canPromote(piece, fromRow, toRow, gameState.turn)) {
+                gameState.pendingPromotion = {
+                    fromRow: fromRow,
+                    fromCol: fromCol,
+                    toRow: toRow,
+                    toCol: toCol,
+                    piece: piece,
+                    capturedPiece: capturedPiece
+                };
+                document.getElementById('promotionModal').classList.add('show');
+                return;
+            }
+            
+            executeMoveInternal(fromRow, fromCol, toRow, toCol, piece, capturedPiece, false);
+        }
+        
+        // 実際の移動処理
+        function executeMoveInternal(fromRow, fromCol, toRow, toCol, piece, capturedPiece, promote) {
+            if (capturedPiece) {
+                const originalPiece = originalPieces[capturedPiece] || capturedPiece;
+                gameState.capturedPieces[gameState.turn].push(originalPiece);
+            }
+            
+            const finalPiece = promote ? promotedPieces[piece] : piece;
+            gameState.board[toRow][toCol] = finalPiece;
+            gameState.board[fromRow][fromCol] = '';
+            
+            gameState.pieceOwners[toRow][toCol] = gameState.pieceOwners[fromRow][fromCol];
+            gameState.pieceOwners[fromRow][fromCol] = null;
+            
+            const moveData = {
+                from: fromRow + '' + fromCol,
+                to: toRow + '' + toCol,
+                piece: piece,
+                captured: capturedPiece,
+                promoted: promote
+            };
+            
+            gameState.moveHistory.push(moveData);
+            
+            // オンラインモードの場合、相手に送信
+            if (gameState.isOnlineMode && onlineState.connected) {
+                sendMoveToOpponent(moveData);
+            }
+            
+            gameState.turn = gameState.turn === 'sente' ? 'gote' : 'sente';
+            
+            // 王手・詰みチェック
+            const opponent = gameState.turn;
+            if (isInCheck(opponent)) {
+                if (isCheckmate(opponent)) {
+                    const winner = opponent === 'sente' ? '後手' : '先手';
+                    showGameOver(winner + 'の勝ち！', '詰みです！');
+                    gameState.gameOver = true;
+                } else {
+                    showNotification('王手！', 'warning');
+                    gameState.inCheck = true;
+                }
+            } else {
+                gameState.inCheck = false;
+            }
+            
+            initBoard();
+            updateMoveDisplay();
+            
+            // AIモードで相手の番になったらAIが指す
+            // CPUモードで相手の番になったらCPUが指す
+            if (!gameState.gameOver && gameState.isAIMode && gameState.turn === 'gote') {
+                setTimeout(makeAIMove, 1000);
+            }
+        }
+        
+        // 成りの確認処理
+        function confirmPromotion(promote) {
+            document.getElementById('promotionModal').classList.remove('show');
+            
+            if (gameState.pendingPromotion) {
+                const p = gameState.pendingPromotion;
+                executeMoveInternal(p.fromRow, p.fromCol, p.toRow, p.toCol, p.piece, p.capturedPiece, promote);
+                gameState.pendingPromotion = null;
+            }
+        }
+        
+        // 駒台のクリック処理を追加
+        function initCapturedPieceHandlers() {
+            const senteDiv = document.getElementById('senteCaptured');
+            const goteDiv = document.getElementById('goteCaptured');
+            
+            senteDiv.addEventListener('click', function(e) {
+                if (e.target.classList.contains('captured-piece') && gameState.turn === 'sente') {
+                    handleCapturedPieceClick(e.target, 'sente');
+                }
+            });
+            
+            goteDiv.addEventListener('click', function(e) {
+                if (e.target.classList.contains('captured-piece') && gameState.turn === 'gote') {
+                    handleCapturedPieceClick(e.target, 'gote');
+                }
+            });
+        }
+        
+        // 駒台の駒をクリック
+        function handleCapturedPieceClick(element, owner) {
+            clearSelection();
+            
+            element.classList.add('selected');
+            const index = Array.from(element.parentNode.children).indexOf(element);
+            gameState.selectedCapturedPiece = {
+                piece: gameState.capturedPieces[owner][index],
+                index: index,
+                owner: owner
+            };
+            
+            highlightDropTargets();
+        }
+        
+        // 駒を打てる場所をハイライト
+        function highlightDropTargets() {
+            for (let row = 0; row < 9; row++) {
+                for (let col = 0; col < 9; col++) {
+                    if (canDropPiece(row, col)) {
+                        const cellSelector = '[data-row="' + row + '"][data-col="' + col + '"]';
+                        const cell = document.querySelector(cellSelector);
+                        cell.classList.add('drop-target');
+                    }
+                }
+            }
+        }
+        
+        // 駒を打てるかチェック
+        function canDropPiece(row, col) {
+            if (!gameState.selectedCapturedPiece) return false;
+            if (gameState.board[row][col] !== '') return false;
+            
+            const piece = gameState.selectedCapturedPiece.piece;
+            const owner = gameState.selectedCapturedPiece.owner;
+            
+            // 二歩チェック
+            if (piece === '歩') {
+                for (let r = 0; r < 9; r++) {
+                    if (gameState.board[r][col] === '歩' && gameState.pieceOwners[r][col] === owner) {
+                        return false;
+                    }
+                }
+                
+                // 打ち歩詰めチェック
+                const opponent = owner === 'sente' ? 'gote' : 'sente';
+                const opponentKingPos = findKingPosition(opponent);
+                if (opponentKingPos) {
+                    const kingRow = opponentKingPos[0];
+                    const kingCol = opponentKingPos[1];
+                    
+                    const willCheck = (owner === 'sente' && row === kingRow - 1 && col === kingCol) ||
+                                    (owner === 'gote' && row === kingRow + 1 && col === kingCol);
+                    
+                    if (willCheck) {
+                        gameState.board[row][col] = '歩';
+                        gameState.pieceOwners[row][col] = owner;
+                        
+                        const isCheckmateResult = isCheckmate(opponent);
+                        
+                        gameState.board[row][col] = '';
+                        gameState.pieceOwners[row][col] = null;
+                        
+                        if (isCheckmateResult) {
+                            return false;
+                        }
+                    }
+                }
+            }
+            
+            // 行きどころのない駒チェック
+            if (piece === '歩' || piece === '香') {
+                if ((owner === 'sente' && row === 0) || (owner === 'gote' && row === 8)) {
+                    return false;
+                }
+            } else if (piece === '桂') {
+                if ((owner === 'sente' && row <= 1) || (owner === 'gote' && row >= 7)) {
+                    return false;
+                }
+            }
+            
+            return true;
+        }
+        
+        // 駒を打つ
+        function dropPiece(row, col) {
+            const selected = gameState.selectedCapturedPiece;
+            
+            gameState.board[row][col] = selected.piece;
+            gameState.pieceOwners[row][col] = selected.owner;
+            
+            gameState.capturedPieces[selected.owner].splice(selected.index, 1);
+            
+            const moveData = {
+                drop: true,
+                to: row + '' + col,
+                piece: selected.piece
+            };
+            
+            gameState.moveHistory.push(moveData);
+            
+            // オンラインモードの場合、相手に送信
+            if (gameState.isOnlineMode && onlineState.connected) {
+                sendMoveToOpponent(moveData);
+            }
+            
+            gameState.turn = gameState.turn === 'sente' ? 'gote' : 'sente';
+            gameState.selectedCapturedPiece = null;
+            
+            // 王手・詰みチェック
+            const opponent = gameState.turn;
+            if (isInCheck(opponent)) {
+                if (isCheckmate(opponent)) {
+                    const winner = opponent === 'sente' ? '後手' : '先手';
+                    showGameOver(winner + 'の勝ち！', '詰みです！');
+                    gameState.gameOver = true;
+                } else {
+                    showNotification('王手！', 'warning');
+                    gameState.inCheck = true;
+                }
+            } else {
+                gameState.inCheck = false;
+            }
+            
+            initBoard();
+            updateMoveDisplay();
+            
+            // CPUモードで相手の番になったらCPUが指す
+            if (!gameState.gameOver && gameState.isAIMode && gameState.turn === 'gote') {
+                setTimeout(makeAIMove, 1000);
+            }
+        }
+        
+        // 王の位置を探す
+        function findKingPosition(player) {
+            for (let row = 0; row < 9; row++) {
+                for (let col = 0; col < 9; col++) {
+                    if (gameState.board[row][col] === '王' && gameState.pieceOwners[row][col] === player) {
+                        return [row, col];
+                    }
+                }
+            }
+            return null;
+        }
+        
+        // 特定の位置が攻撃されているかチェック
+        function isSquareAttacked(targetRow, targetCol, byPlayer) {
+            for (let row = 0; row < 9; row++) {
+                for (let col = 0; col < 9; col++) {
+                    if (gameState.pieceOwners[row][col] === byPlayer) {
+                        if (isValidMove(row, col, targetRow, targetCol, true)) {
+                            return true;
+                        }
+                    }
+                }
+            }
+            
+            const pieces = gameState.capturedPieces[byPlayer];
+            for (let i = 0; i < pieces.length; i++) {
+                gameState.selectedCapturedPiece = {
+                    piece: pieces[i],
+                    index: i,
+                    owner: byPlayer
+                };
+                if (canDropPiece(targetRow, targetCol)) {
+                    gameState.selectedCapturedPiece = null;
+                    return true;
+                }
+            }
+            gameState.selectedCapturedPiece = null;
+            
+            return false;
+        }
+        
+        // 王手判定
+        function isInCheck(player) {
+            const kingPos = findKingPosition(player);
+            if (!kingPos) return false;
+            
+            const opponent = player === 'sente' ? 'gote' : 'sente';
+            return isSquareAttacked(kingPos[0], kingPos[1], opponent);
+        }
+        
+        // 詰み判定
+        function isCheckmate(player) {
+            if (!isInCheck(player)) return false;
+            
+            const kingPos = findKingPosition(player);
+            if (!kingPos) return false;
+            
+            const kingRow = kingPos[0];
+            const kingCol = kingPos[1];
+            const opponent = player === 'sente' ? 'gote' : 'sente';
+            
+            const kingMoves = [[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]];
+            
+            for (let i = 0; i < kingMoves.length; i++) {
+                const newRow = kingRow + kingMoves[i][0];
+                const newCol = kingCol + kingMoves[i][1];
+                
+                if (newRow >= 0 && newRow < 9 && newCol >= 0 && newCol < 9) {
+                    if (gameState.pieceOwners[newRow][newCol] !== player) {
+                        const tempPiece = gameState.board[newRow][newCol];
+                        const tempOwner = gameState.pieceOwners[newRow][newCol];
+                        
+                        gameState.board[newRow][newCol] = '王';
+                        gameState.board[kingRow][kingCol] = '';
+                        gameState.pieceOwners[newRow][newCol] = player;
+                        gameState.pieceOwners[kingRow][kingCol] = null;
+                        
+                        const stillInCheck = isSquareAttacked(newRow, newCol, opponent);
+                        
+                        gameState.board[kingRow][kingCol] = '王';
+                        gameState.board[newRow][newCol] = tempPiece;
+                        gameState.pieceOwners[kingRow][kingCol] = player;
+                        gameState.pieceOwners[newRow][newCol] = tempOwner;
+                        
+                        if (!stillInCheck) {
+                            return false;
+                        }
+                    }
+                }
+            }
+            
+            const possibleMoves = getAllPossibleMoves(player);
+            
+            for (let i = 0; i < possibleMoves.length; i++) {
+                const move = possibleMoves[i];
+                
+                if (move.drop) {
+                    gameState.board[move.toRow][move.toCol] = move.piece;
+                    gameState.pieceOwners[move.toRow][move.toCol] = player;
+                    
+                    const stillInCheck = isInCheck(player);
+                    
+                    gameState.board[move.toRow][move.toCol] = '';
+                    gameState.pieceOwners[move.toRow][move.toCol] = null;
+                    
+                    if (!stillInCheck) {
+                        return false;
+                    }
+                } else {
+                    const tempPiece = gameState.board[move.toRow][move.toCol];
+                    const tempOwner = gameState.pieceOwners[move.toRow][move.toCol];
+                    const movingPiece = gameState.board[move.fromRow][move.fromCol];
+                    
+                    gameState.board[move.toRow][move.toCol] = movingPiece;
+                    gameState.board[move.fromRow][move.fromCol] = '';
+                    gameState.pieceOwners[move.toRow][move.toCol] = player;
+                    gameState.pieceOwners[move.fromRow][move.fromCol] = null;
+                    
+                    const stillInCheck = isInCheck(player);
+                    
+                    gameState.board[move.fromRow][move.fromCol] = movingPiece;
+                    gameState.board[move.toRow][move.toCol] = tempPiece;
+                    gameState.pieceOwners[move.fromRow][move.fromCol] = player;
+                    gameState.pieceOwners[move.toRow][move.toCol] = tempOwner;
+                    
+                    if (!stillInCheck) {
+                        return false;
+                    }
+                }
+            }
+            
+            return true;
+        }
+        
+        // シンプルなCPUの実装
+        function makeAIMove() {
+            const turnIndicator = document.getElementById('turnIndicator');
+            turnIndicator.innerHTML = '<span class="ai-thinking">CPUが考えています...</span>';
+            
+            const possibleMoves = getAllPossibleMoves('gote');
+            
+            if (possibleMoves.length === 0) {
+                showGameOver('先手の勝ち！', 'CPUが投了しました');
+                return;
+            }
+            
+            let validMoves = [];
+            if (gameState.inCheck) {
+                for (let i = 0; i < possibleMoves.length; i++) {
+                    const move = possibleMoves[i];
+                    
+                    if (move.drop) {
+                        gameState.board[move.toRow][move.toCol] = move.piece;
+                        gameState.pieceOwners[move.toRow][move.toCol] = 'gote';
+                        
+                        const stillInCheck = isInCheck('gote');
+                        
+                        gameState.board[move.toRow][move.toCol] = '';
+                        gameState.pieceOwners[move.toRow][move.toCol] = null;
+                        
+                        if (!stillInCheck) {
+                            validMoves.push(move);
+                        }
+                    } else {
+                        const tempPiece = gameState.board[move.toRow][move.toCol];
+                        const tempOwner = gameState.pieceOwners[move.toRow][move.toCol];
+                        const movingPiece = gameState.board[move.fromRow][move.fromCol];
+                        
+                        gameState.board[move.toRow][move.toCol] = movingPiece;
+                        gameState.board[move.fromRow][move.fromCol] = '';
+                        gameState.pieceOwners[move.toRow][move.toCol] = 'gote';
+                        gameState.pieceOwners[move.fromRow][move.fromCol] = null;
+                        
+                        const stillInCheck = isInCheck('gote');
+                        
+                        gameState.board[move.fromRow][move.fromCol] = movingPiece;
+                        gameState.board[move.toRow][move.toCol] = tempPiece;
+                        gameState.pieceOwners[move.fromRow][move.fromCol] = 'gote';
+                        gameState.pieceOwners[move.toRow][move.toCol] = tempOwner;
+                        
+                        if (!stillInCheck) {
+                            validMoves.push(move);
+                        }
+                    }
+                }
+                
+                if (validMoves.length === 0) {
+                    showGameOver('先手の勝ち！', '詰みです！');
+                    return;
+                }
+            } else {
+                validMoves = possibleMoves;
+            }
+            
+            const randomMove = validMoves[Math.floor(Math.random() * validMoves.length)];
+            
+            if (randomMove.drop) {
+                gameState.selectedCapturedPiece = {
+                    piece: randomMove.piece,
+                    index: randomMove.index,
+                    owner: 'gote'
+                };
+                dropPiece(randomMove.toRow, randomMove.toCol);
+            } else {
+                const piece = gameState.board[randomMove.fromRow][randomMove.fromCol];
+                const promote = canPromote(piece, randomMove.fromRow, randomMove.toRow, 'gote') && Math.random() > 0.3;
+                
+                executeMoveInternal(randomMove.fromRow, randomMove.fromCol, randomMove.toRow, randomMove.toCol, 
+                                  piece, randomMove.capturedPiece, promote);
+            }
+            
+            if (!randomMove.drop) {
+                const fromCell = document.querySelector('[data-row="' + randomMove.fromRow + '"][data-col="' + randomMove.fromCol + '"]');
+                const toCell = document.querySelector('[data-row="' + randomMove.toRow + '"][data-col="' + randomMove.toCol + '"]');
+                if (fromCell) fromCell.classList.add('ai-move-from');
+                if (toCell) toCell.classList.add('ai-move-to');
+            }
+        }
+        
+        // 全ての可能な手を取得
+        function getAllPossibleMoves(player) {
+            const moves = [];
+            
+            for (let row = 0; row < 9; row++) {
+                for (let col = 0; col < 9; col++) {
+                    if (gameState.pieceOwners[row][col] === player) {
+                        for (let toRow = 0; toRow < 9; toRow++) {
+                            for (let toCol = 0; toCol < 9; toCol++) {
+                                if (isValidMove(row, col, toRow, toCol)) {
+                                    moves.push({
+                                        fromRow: row,
+                                        fromCol: col,
+                                        toRow: toRow,
+                                        toCol: toCol,
+                                        capturedPiece: gameState.board[toRow][toCol]
+                                    });
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            
+            for (let i = 0; i < gameState.capturedPieces[player].length; i++) {
+                const piece = gameState.capturedPieces[player][i];
+                for (let row = 0; row < 9; row++) {
+                    for (let col = 0; col < 9; col++) {
+                        gameState.selectedCapturedPiece = {
+                            piece: piece,
+                            index: i,
+                            owner: player
+                        };
+                        if (canDropPiece(row, col)) {
+                            moves.push({
+                                drop: true,
+                                piece: piece,
+                                index: i,
+                                toRow: row,
+                                toCol: col
+                            });
+                        }
+                    }
+                }
+            }
+            gameState.selectedCapturedPiece = null;
+            
+            return moves;
+        }
+        
+        // オンライン対戦機能
+        function joinRoom() {
+            const roomId = document.getElementById('roomId').value.trim();
+            const password = document.getElementById('roomPassword').value.trim();
+            
+            if (!roomId || !password) {
+                showNotification('ルームIDとパスワードを入力してください', 'warning');
+                return;
+            }
+            
+            // ここで実際のサーバー接続を行う（デモでは模擬）
+            connectToServer(roomId, password);
+        }
+        
+        // サーバーに接続（デモ実装）
+        function connectToServer(roomId, password) {
+            updateConnectionStatus('connecting');
+            showNotification('サーバーに接続中...', 'info');
+            
+            // 実際の実装では WebSocket または WebRTC を使用
+            // ここではデモとして setTimeout で模擬
+            setTimeout(() => {
+                // 成功の場合
+                onlineState.connected = true;
+                onlineState.roomId = roomId;
+                onlineState.isHost = Math.random() > 0.5; // ランダムでホスト決定（デモ用）
+                
+                updateConnectionStatus('connected');
+                showNotification(`ルーム "${roomId}" に参加しました`, 'info');
+                
+                document.getElementById('leaveRoomBtn').style.display = 'inline-block';
+                document.getElementById('chatSection').style.display = 'block';
+                
+                // ホスト/ゲストの表示更新
+                const role = onlineState.isHost ? '先手（ホスト）' : '後手（ゲスト）';
+                showNotification(`あなたは${role}です`, 'info');
+                
+                updateDisplay();
+            }, 2000);
+        }
+        
+        // ルームから退出
+        function leaveRoom() {
+            if (onlineState.connected) {
+                // 実際の実装では切断処理
+                onlineState.connected = false;
+                onlineState.roomId = null;
+                onlineState.isHost = false;
+                
+                updateConnectionStatus('disconnected');
+                showNotification('ルームから退出しました');
+                
+                document.getElementById('leaveRoomBtn').style.display = 'none';
+                document.getElementById('chatSection').style.display = 'none';
+            }
+        }
+        
+        // 接続状態の更新
+        function updateConnectionStatus(status) {
+            const statusElement = document.getElementById('connectionStatus');
+            statusElement.className = 'connection-status ' + status;
+            
+            switch (status) {
+                case 'connected':
+                    statusElement.textContent = '✅ オンライン接続中';
+                    break;
+                case 'connecting':
+                    statusElement.textContent = '🔄 接続中...';
+                    break;
+                case 'disconnected':
+                default:
+                    statusElement.textContent = '❌ オフライン';
+                    break;
+            }
+        }
+        
+        // 相手に手を送信
+        function sendMoveToOpponent(moveData) {
+            // 実際の実装では WebSocket で送信
+            console.log('Sending move to opponent:', moveData);
+            
+            // デモとして自動的に相手の手として受信
+            // （実際は相手からの手を受信する）
+        }
+        
+        // チャットメッセージ送信
+        function sendChatMessage() {
+            const input = document.getElementById('chatInput');
+            const message = input.value.trim();
+            
+            if (!message) return;
+            
+            addChatMessage('あなた', message);
+            input.value = '';
+            
+            // 実際の実装では相手に送信
+            console.log('Sending chat message:', message);
+        }
+        
+        // チャットメッセージ追加
+        function addChatMessage(sender, message) {
+            const chatMessages = document.getElementById('chatMessages');
+            const messageElement = document.createElement('div');
+            messageElement.style.cssText = 'margin-bottom: 5px; font-size: 12px;';
+            messageElement.innerHTML = `<strong>${sender}:</strong> ${message}`;
+            
+            chatMessages.appendChild(messageElement);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+        
+        // ゲーム終了表示
+        function showGameOver(title, message) {
+            gameState.gameOver = true;
+            document.getElementById('gameOverTitle').textContent = title;
+            document.getElementById('gameOverMessage').textContent = message;
+            document.getElementById('gameOverModal').classList.add('show');
+        }
+        
+        // 表示更新
+        function updateDisplay() {
+            const turnIndicator = document.getElementById('turnIndicator');
+            const currentPlayer = gameState.turn === 'sente' ? '先手' : '後手';
+            
+            if (gameState.inCheck) {
+                turnIndicator.innerHTML = '<span class="check-indicator">' + currentPlayer + 'の番（王手）</span>';
+            } else {
+                turnIndicator.textContent = currentPlayer + 'の番';
+            }
+            
+            document.getElementById('moveCount').textContent = gameState.moveHistory.length;
+            
+            updateCapturedPieces();
+            
+            // ゲームモード表示
+            const modeIndicator = document.getElementById('gameModeIndicator');
+            if (gameState.isOnlineMode) {
+                modeIndicator.textContent = 'オンライン対戦モード';
+            } else if (gameState.isAIMode) {
+                modeIndicator.textContent = 'CPU対戦モード';
+            } else {
+                modeIndicator.textContent = 'ローカル対戦モード';
+            }
+            
+            // オンラインモードでの手番制限表示
+            if (gameState.isOnlineMode && onlineState.connected && !isMyTurn()) {
+                turnIndicator.innerHTML += ' <small>(相手の手番)</small>';
+            }
+        }
+        
+        // 手順表示更新
+        function updateMoveDisplay() {
+            const historyDiv = document.getElementById('moveHistory');
+            historyDiv.innerHTML = '';
+            
+            for (let i = 0; i < gameState.moveHistory.length; i++) {
+                const move = gameState.moveHistory[i];
+                const moveElement = document.createElement('div');
+                let moveText = (i + 1) + '. ';
+                
+                if (move.drop) {
+                    moveText += move.piece + '打' + move.to;
+                } else {
+                    moveText += move.piece + move.from + '→' + move.to;
+                    if (move.captured) {
+                        moveText += '(' + move.captured + ')';
+                    }
+                    if (move.promoted) {
+                        moveText += '成';
+                    }
+                }
+                
+                moveElement.textContent = moveText;
+                historyDiv.appendChild(moveElement);
+            }
+            
+            historyDiv.scrollTop = historyDiv.scrollHeight;
+        }
+        
+        // 初心者モード切り替え
+        function toggleBeginnerMode() {
+            gameState.beginnerMode = !gameState.beginnerMode;
+            const toggle = document.getElementById('beginnerToggle');
+            
+            if (gameState.beginnerMode) {
+                toggle.textContent = '🎓 初心者モードON';
+                toggle.classList.add('success');
+                showNotification('初心者モードON：駒の動きを詳しく表示します', 'info');
+            } else {
+                toggle.textContent = '🎓 初心者モード';
+                toggle.classList.remove('success');
+                showNotification('初心者モードOFF', 'info');
+            }
+        }
+        
+        // タブ切り替え
+        function switchTab(tabName) {
+            document.querySelectorAll('.info-tab').forEach(function(tab) {
+                tab.classList.remove('active');
+            });
+            document.querySelectorAll('.info-content').forEach(function(content) {
+                content.classList.remove('active');
+            });
+            
+            event.target.classList.add('active');
+            document.getElementById(tabName + 'Content').classList.add('active');
+        }
+        
+        // 駒のヘルプ表示
+        function showPieceHelp(piece) {
+            const detail = pieceDetails[piece];
+            if (detail) {
+                showNotification(piece + '（' + detail.name + '）: ' + detail.description + ' 動き方: ' + detail.movement, 'info');
+            }
+        }
+        
+        // その他の関数
+        function startNewGame(gameMode) {
+            // 既存のオンライン接続をクリア
+            if (onlineState.connected) {
+                leaveRoom();
+            }
+            
+            gameState = {
+                board: JSON.parse(JSON.stringify(initialBoard)),
+                turn: 'sente',
+                selectedCell: null,
+                selectedCapturedPiece: null,
+                capturedPieces: { sente: [], gote: [] },
+                moveHistory: [],
+                gameOver: false,
+                pieceOwners: null,
+                isAIMode: gameMode === 'ai',
+                isOnlineMode: gameMode === 'online',
+                beginnerMode: gameState.beginnerMode,
+                catMode: gameState.catMode,
+                pendingPromotion: null,
+                inCheck: false
+            };
+            
+            initPieceOwners();
+            clearSelection();
+            initBoard();
+            
+            if (gameState.isOnlineMode) {
+                // オンライン対戦セクションを表示
+                document.getElementById('onlineSection').style.display = 'block';
+                showNotification('オンライン対戦モードを開始しました。ルームに参加してください。', 'info');
+            } else {
+                // オンライン対戦セクションを非表示
+                document.getElementById('onlineSection').style.display = 'none';
+                
+                if (gameState.isAIMode) {
+                    showNotification('CPU対戦モードで開始しました', 'info');
+                } else {
+                    showNotification('ローカル対戦モードで開始しました', 'info');
+                }
+            }
+        }
+        
+        function getAIHint() {
+            const possibleMoves = getAllPossibleMoves(gameState.turn);
+            if (possibleMoves.length > 0) {
+                const hint = possibleMoves[Math.floor(Math.random() * possibleMoves.length)];
+                if (hint.drop) {
+                    showNotification('ヒント: ' + hint.piece + 'を' + hint.toRow + hint.toCol + 'に打つ', 'info');
+                } else {
+                    showNotification('ヒント: ' + hint.fromRow + hint.fromCol + 'から' + hint.toRow + hint.toCol + 'へ', 'info');
+                }
+            }
+        }
+        
+        function saveGame() {
+            const gameData = JSON.stringify(gameState);
+            const blob = new Blob([gameData], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'shogi_game_' + new Date().getTime() + '.json';
+            a.click();
+            URL.revokeObjectURL(url);
+            showNotification('棋譜を保存しました', 'info');
+        }
+        
+        function closeModal() {
+            document.querySelectorAll('.modal').forEach(function(modal) {
+                modal.classList.remove('show');
+            });
+        }
+        
+        // 通知表示
+        function showNotification(message, type) {
+            if (!type) type = 'info';
+            
+            const existingNotification = document.querySelector('.game-notification');
+            if (existingNotification) {
+                existingNotification.remove();
+            }
+            
+            const notification = document.createElement('div');
+            notification.className = 'game-notification';
+            
+            let backgroundColor;
+            if (type === 'error') {
+                backgroundColor = '#e74c3c';
+            } else if (type === 'warning') {
+                backgroundColor = '#f39c12';
+            } else {
+                backgroundColor = '#3498db';
+            }
+            
+            notification.style.cssText = 
+                'position: fixed;' +
+                'top: 20px;' +
+                'right: 20px;' +
+                'background: ' + backgroundColor + ';' +
+                'color: white;' +
+                'padding: 15px 20px;' +
+                'border-radius: 8px;' +
+                'z-index: 2000;' +
+                'font-weight: bold;' +
+                'box-shadow: 0 4px 12px rgba(0,0,0,0.3);' +
+                'max-width: 300px;' +
+                'word-wrap: break-word;' +
+                'animation: slideInRight 0.3s ease-out;';
+            
+            notification.textContent = message;
+            document.body.appendChild(notification);
+            
+            setTimeout(function() {
+                if (notification.parentNode) {
+                    notification.style.animation = 'slideInRight 0.3s ease-out reverse';
+                    setTimeout(function() {
+                        if (notification.parentNode) {
+                            notification.parentNode.removeChild(notification);
+                        }
+                    }, 300);
+                }
+            }, 3000);
+        }
+        
+        // チャット入力でEnterキー対応
+        document.addEventListener('DOMContentLoaded', function() {
+            const chatInput = document.getElementById('chatInput');
+            if (chatInput) {
+                chatInput.addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter') {
+                        sendChatMessage();
+                    }
+                });
+            }
+        });
+        
+        // 初期化
+        document.addEventListener('DOMContentLoaded', function() {
+            initPieceOwners();
+            initBoard();
+            initCapturedPieceHandlers();
+            updateConnectionStatus('disconnected');
+        });
+    </script>
+</body>
+</html><!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>将棋 - AI対戦・定跡対応オンライン将棋PWA</title>
     <link rel="manifest" href="./manifest.json">
     <link rel="apple-touch-icon" href="./icons/icon-192x192.png">

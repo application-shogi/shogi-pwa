@@ -871,20 +871,11 @@
                     return false;
                 }
                 
-                // databaseURL の確認
-                if (!firebaseConfig.databaseURL || firebaseConfig.databaseURL.includes('default-rtdb.firebaseio.com')) {
-                    statusDiv.innerHTML = '⚠️ Realtime Database の設定が必要です<br><small>Firebase Console で Realtime Database を有効化してください</small>';
-                    statusDiv.parentElement.style.background = '#fff3e0';
-                    statusDiv.parentElement.style.color = '#ef6c00';
-                    joinBtn.disabled = false; // 設定確認のため有効にしておく
-                    return false;
-                } else {
-                    statusDiv.innerHTML = '✅ Firebase設定完了 - オンライン対戦が利用できます！';
-                    statusDiv.parentElement.style.background = '#e8f5e8';
-                    statusDiv.parentElement.style.color = '#2e7d32';
-                    joinBtn.disabled = false;
-                    return true;
-                }
+                statusDiv.innerHTML = '✅ Firebase設定完了 - オンライン対戦が利用可能です！';
+                statusDiv.parentElement.style.background = '#e8f5e8';
+                statusDiv.parentElement.style.color = '#2e7d32';
+                joinBtn.disabled = false;
+                return true;
                 
             } catch (error) {
                 statusDiv.innerHTML = '❌ Firebase設定エラー: ' + error.message;
@@ -899,7 +890,7 @@
         const firebaseConfig = {
             apiKey: "AIzaSyBj58MkqswywncKrifsD5RyG68CuqkGQKQ",
             authDomain: "my-shogi-online.firebaseapp.com",
-            databaseURL: "https://my-shogi-online-default-rtdb.firebaseio.com", // Realtime Database URL（要設定）
+            databaseURL: "https://my-shogi-online-default-rtdb.asia-southeast1.firebasedatabase.app/",
             projectId: "my-shogi-online",
             storageBucket: "my-shogi-online.firebasestorage.app",
             messagingSenderId: "233156650037",

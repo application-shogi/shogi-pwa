@@ -97,6 +97,17 @@
             100% { opacity: 1; }
         }
         
+        @keyframes slideInRight {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+        
         .game-stats {
             font-size: 0.8rem;
             opacity: 0.8;
@@ -200,6 +211,50 @@
         
         .piece.promoted {
             color: #d4af37;
+        }
+        
+        /* 猫モード用の追加スタイル */
+        .piece img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            transition: all 0.2s ease;
+        }
+
+        .piece img:hover {
+            transform: scale(1.1);
+        }
+
+        .piece.gote img:hover {
+            transform: rotate(180deg) scale(1.1);
+        }
+
+        .captured-piece img {
+            width: 20px;
+            height: 20px;
+            object-fit: contain;
+        }
+
+        .captured-piece:hover img {
+            transform: scale(1.1);
+        }
+
+        .cat-loading {
+            position: relative;
+        }
+
+        .cat-loading::after {
+            content: "🐱";
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            animation: catLoadingPulse 1s infinite;
+        }
+
+        @keyframes catLoadingPulse {
+            0%, 100% { opacity: 0.5; }
+            50% { opacity: 1; }
         }
         
         .captures {
@@ -324,50 +379,6 @@
         @keyframes catPulse {
             0%, 100% { transform: scale(1); }
             50% { transform: scale(1.05); }
-        }
-        
-        /* 猫モード用の追加スタイル */
-        .piece img {
-            width: 100%;
-            height: 100%;
-            object-fit: contain;
-            transition: all 0.2s ease;
-        }
-
-        .piece img:hover {
-            transform: scale(1.1);
-        }
-
-        .piece.gote img:hover {
-            transform: rotate(180deg) scale(1.1); /* 後手の画像のホバー時も回転を維持 */
-        }
-
-        .captured-piece img {
-            width: 20px;
-            height: 20px;
-            object-fit: contain;
-        }
-
-        .captured-piece:hover img {
-            transform: scale(1.1); /* 駒台では回転なし、スケールのみ */
-        }
-
-        .cat-loading {
-            position: relative;
-        }
-
-        .cat-loading::after {
-            content: "🐱";
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            animation: catLoadingPulse 1s infinite;
-        }
-
-        @keyframes catLoadingPulse {
-            0%, 100% { opacity: 0.5; }
-            50% { opacity: 1; }
         }
         
         .game-info {
@@ -570,31 +581,6 @@
                 min-width: 80px;
                 max-width: 120px;
             }
-            
-            /* モバイルでボタンテキストを短縮 */
-            .controls .button {
-                text-indent: -9999px;
-                position: relative;
-            }
-            
-            .controls .button:after {
-                position: absolute;
-                left: 50%;
-                top: 50%;
-                transform: translate(-50%, -50%);
-                text-indent: 0;
-                font-size: 11px;
-            }
-            
-            .controls .button:nth-child(1):after { content: "🏠 ローカル"; }
-            .controls .button:nth-child(2):after { content: "💻 CPU"; }
-            .controls .button:nth-child(3):after { content: "🌐 オンライン"; }
-            .controls .button:nth-child(4):after { content: "🎓 初心者"; }
-            .controls .button:nth-child(4).success:after { content: "🎓 初心者ON"; }
-            .controls .button:nth-child(5):after { content: "🐱 猫"; }
-            .controls .button:nth-child(5).active:after { content: "🐱 猫ON"; }
-            .controls .button:nth-child(6):after { content: "💡 ヒント"; }
-            .controls .button:nth-child(7):after { content: "💾 保存"; }
         }
     </style>
 </head>
@@ -732,8 +718,6 @@
         </div>
     </div>
     
-
-    
     <!-- ゲーム終了モーダル -->
     <div class="modal" id="gameOverModal">
         <div class="modal-content">
@@ -789,6 +773,8 @@
             '全': [[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,0]],
             '龍': 'dragon',
             '馬': 'horse'
+        };
+        
         // オンライン対戦状態
         let onlineState = {
             connected: false,
@@ -856,65 +842,65 @@
             inCheck: false
         };
         
+        // Firebase設定（実際のプロジェクト設定に置き換えてください）
+        const firebaseConfig = {
+            apiKey: "YOUR_API_KEY",
+            authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+            databaseURL: "https://YOUR_PROJECT_ID-default-rtdb.firebaseio.com/",
+            projectId: "YOUR_PROJECT_ID",
+            storageBucket: "YOUR_PROJECT_ID.appspot.com",
+            messagingSenderId: "YOUR_SENDER_ID",
+            appId: "YOUR_APP_ID"
+        };
+        
+        // Firebase変数
+        let database = null;
+        let currentRoomRef = null;
+        let movesRef = null;
+        let chatRef = null;
+        
         // Firebase設定チェック
         function checkFirebaseConfig() {
             const statusDiv = document.getElementById('firebaseCheck');
+            const statusContainer = document.getElementById('firebaseStatus');
             const joinBtn = document.getElementById('joinRoomBtn');
             
             try {
                 // Firebase が利用可能かチェック
                 if (typeof firebase === 'undefined') {
                     statusDiv.innerHTML = '❌ Firebase SDK が読み込まれていません';
-                    statusDiv.parentElement.style.background = '#ffebee';
-                    statusDiv.parentElement.style.color = '#c62828';
+                    statusContainer.style.background = '#ffebee';
+                    statusContainer.style.color = '#c62828';
                     joinBtn.disabled = true;
                     return false;
                 }
                 
+                // Firebase設定をチェック
+                if (firebaseConfig.apiKey === "YOUR_API_KEY") {
+                    statusDiv.innerHTML = '⚠️ Firebase設定が必要です。firebaseConfigを実際の値に置き換えてください。';
+                    statusContainer.style.background = '#fff3e0';
+                    statusContainer.style.color = '#f57c00';
+                    joinBtn.disabled = true;
+                    return false;
+                }
+                
+                // Firebase初期化
+                if (!firebase.apps.length) {
+                    firebase.initializeApp(firebaseConfig);
+                }
+                database = firebase.database();
+                
                 statusDiv.innerHTML = '✅ Firebase設定完了 - オンライン対戦が利用可能です！';
-                statusDiv.parentElement.style.background = '#e8f5e8';
-                statusDiv.parentElement.style.color = '#2e7d32';
+                statusContainer.style.background = '#e8f5e8';
+                statusContainer.style.color = '#2e7d32';
                 joinBtn.disabled = false;
                 return true;
                 
             } catch (error) {
                 statusDiv.innerHTML = '❌ Firebase設定エラー: ' + error.message;
-                statusDiv.parentElement.style.background = '#ffebee';
-                statusDiv.parentElement.style.color = '#c62828';
+                statusContainer.style.background = '#ffebee';
+                statusContainer.style.color = '#c62828';
                 joinBtn.disabled = true;
-                return false;
-            }
-        }
-        
-        // Firebase設定（実際のプロジェクト設定）
-        const firebaseConfig = {
-            apiKey: "AIzaSyBj58MkqswywncKrifsD5RyG68CuqkGQKQ",
-            authDomain: "my-shogi-online.firebaseapp.com",
-            databaseURL: "https://my-shogi-online-default-rtdb.asia-southeast1.firebasedatabase.app/",
-            projectId: "my-shogi-online",
-            storageBucket: "my-shogi-online.firebasestorage.app",
-            messagingSenderId: "233156650037",
-            appId: "1:233156650037:web:14802f4bffe4122a39bd7c",
-            measurementId: "G-YLTBF91J1T"
-        };
-        
-        // Firebase初期化
-        let database = null;
-        let currentRoomRef = null;
-        let movesRef = null;
-        let chatRef = null;
-        
-        function initFirebase() {
-            try {
-                if (!firebase.apps.length) {
-                    firebase.initializeApp(firebaseConfig);
-                }
-                database = firebase.database();
-                console.log('Firebase初期化成功');
-                return true;
-            } catch (error) {
-                console.error('Firebase初期化エラー:', error);
-                showNotification('Firebase接続に失敗しました。設定を確認してください。', 'error');
                 return false;
             }
         }
@@ -1122,7 +1108,7 @@
                     const totalCount = results.length;
                     
                     if (loadedCount === 0) {
-                        showNotification('🐱 猫画像が見つかりません。通常モードのままです', 'warning');
+                        showNotification('🐱 猫画像が見つかりません。images/cats/フォルダに画像を配置してください', 'warning');
                         return;
                     } else if (loadedCount < totalCount) {
                         showNotification(`🐱 一部の猫画像が読み込めませんでした (${loadedCount}/${totalCount})`, 'warning');
@@ -1152,6 +1138,412 @@
                 button.classList.remove('active');
             }
         }
+        
+        // オンライン対戦 - ルームに参加
+        function joinRoom() {
+            const password = document.getElementById('roomPassword').value.trim();
+            
+            if (!password) {
+                showNotification('パスワードを入力してください', 'warning');
+                return;
+            }
+            
+            if (!database) {
+                showNotification('Firebase接続が確立されていません', 'error');
+                return;
+            }
+            
+            updateConnectionStatus('connecting');
+            
+            const roomId = 'room_' + btoa(password).replace(/[^a-zA-Z0-9]/g, '');
+            onlineState.roomId = roomId;
+            
+            currentRoomRef = database.ref('rooms/' + roomId);
+            
+            // ルーム状態を確認
+            currentRoomRef.once('value', (snapshot) => {
+                const roomData = snapshot.val();
+                
+                if (!roomData) {
+                    // 新しいルームを作成
+                    createRoom(roomId, password);
+                } else {
+                    // 既存のルームに参加
+                    joinExistingRoom(roomId, roomData);
+                }
+            }).catch((error) => {
+                console.error('ルーム確認エラー:', error);
+                showNotification('ルーム接続に失敗しました', 'error');
+                updateConnectionStatus('disconnected');
+            });
+        }
+        
+        // 新しいルームを作成
+        function createRoom(roomId, password) {
+            const roomData = {
+                password: password,
+                players: {},
+                gameState: {
+                    board: JSON.stringify(gameState.board),
+                    turn: gameState.turn,
+                    capturedPieces: JSON.stringify(gameState.capturedPieces),
+                    moveHistory: JSON.stringify(gameState.moveHistory),
+                    gameOver: gameState.gameOver,
+                    inCheck: gameState.inCheck
+                },
+                createdAt: firebase.database.ServerValue.TIMESTAMP
+            };
+            
+            roomData.players[onlineState.playerId] = {
+                side: 'sente',
+                joinedAt: firebase.database.ServerValue.TIMESTAMP
+            };
+            
+            currentRoomRef.set(roomData).then(() => {
+                onlineState.connected = true;
+                onlineState.isHost = true;
+                onlineState.playerSide = 'sente';
+                
+                setupRoomListeners();
+                updateConnectionStatus('connected');
+                
+                document.getElementById('joinRoomBtn').style.display = 'none';
+                document.getElementById('leaveRoomBtn').style.display = 'inline-block';
+                
+                showNotification('ルームを作成しました。相手の参加を待っています...', 'info');
+                
+            }).catch((error) => {
+                console.error('ルーム作成エラー:', error);
+                showNotification('ルーム作成に失敗しました', 'error');
+                updateConnectionStatus('disconnected');
+            });
+        }
+        
+        // 既存のルームに参加
+        function joinExistingRoom(roomId, roomData) {
+            const players = roomData.players || {};
+            const playerCount = Object.keys(players).length;
+            
+            if (playerCount >= 2) {
+                showNotification('このルームは満室です', 'warning');
+                updateConnectionStatus('disconnected');
+                return;
+            }
+            
+            // 既存プレイヤーの手番を確認
+            const existingPlayer = Object.values(players)[0];
+            const mySide = existingPlayer.side === 'sente' ? 'gote' : 'sente';
+            
+            const playerUpdate = {};
+            playerUpdate['players/' + onlineState.playerId] = {
+                side: mySide,
+                joinedAt: firebase.database.ServerValue.TIMESTAMP
+            };
+            
+            currentRoomRef.update(playerUpdate).then(() => {
+                onlineState.connected = true;
+                onlineState.isHost = false;
+                onlineState.playerSide = mySide;
+                
+                // ゲーム状態を同期
+                if (roomData.gameState) {
+                    syncGameState(roomData.gameState);
+                }
+                
+                setupRoomListeners();
+                updateConnectionStatus('connected');
+                
+                document.getElementById('joinRoomBtn').style.display = 'none';
+                document.getElementById('leaveRoomBtn').style.display = 'inline-block';
+                document.getElementById('chatSection').style.display = 'block';
+                
+                showNotification('対戦相手と接続しました！', 'info');
+                
+            }).catch((error) => {
+                console.error('ルーム参加エラー:', error);
+                showNotification('ルーム参加に失敗しました', 'error');
+                updateConnectionStatus('disconnected');
+            });
+        }
+        
+        // ルームリスナー設定
+        function setupRoomListeners() {
+            if (!currentRoomRef) return;
+            
+            // プレイヤー接続状態監視
+            currentRoomRef.child('players').on('value', (snapshot) => {
+                const players = snapshot.val() || {};
+                const playerCount = Object.keys(players).length;
+                
+                if (playerCount === 2 && !document.getElementById('chatSection').style.display) {
+                    document.getElementById('chatSection').style.display = 'block';
+                    showNotification('対戦相手が参加しました！', 'info');
+                }
+                
+                if (playerCount === 1 && onlineState.connected) {
+                    document.getElementById('chatSection').style.display = 'none';
+                    if (!onlineState.isHost) {
+                        showNotification('対戦相手が退出しました', 'warning');
+                    }
+                }
+            });
+            
+            // ゲーム状態変更監視
+            currentRoomRef.child('gameState').on('value', (snapshot) => {
+                const newGameState = snapshot.val();
+                if (newGameState && onlineState.connected) {
+                    syncGameState(newGameState);
+                }
+            });
+            
+            // 手の変更監視
+            movesRef = currentRoomRef.child('moves');
+            movesRef.on('child_added', (snapshot) => {
+                const moveData = snapshot.val();
+                if (moveData && moveData.playerId !== onlineState.playerId) {
+                    // 相手の手を適用
+                    applyOpponentMove(moveData);
+                }
+            });
+            
+            // チャット監視
+            chatRef = currentRoomRef.child('chat');
+            chatRef.on('child_added', (snapshot) => {
+                const chatData = snapshot.val();
+                if (chatData && chatData.playerId !== onlineState.playerId) {
+                    addChatMessage(chatData.sender, chatData.message);
+                }
+            });
+            
+            // 切断検知
+            currentRoomRef.child('players').child(onlineState.playerId).onDisconnect().remove();
+        }
+        
+        // ゲーム状態同期
+        function syncGameState(newGameState) {
+            try {
+                gameState.board = JSON.parse(newGameState.board);
+                gameState.turn = newGameState.turn;
+                gameState.capturedPieces = JSON.parse(newGameState.capturedPieces);
+                gameState.moveHistory = JSON.parse(newGameState.moveHistory);
+                gameState.gameOver = newGameState.gameOver;
+                gameState.inCheck = newGameState.inCheck;
+                
+                // 駒の所有者を再計算
+                initPieceOwners();
+                initBoard();
+                updateMoveDisplay();
+            } catch (error) {
+                console.error('ゲーム状態同期エラー:', error);
+            }
+        }
+        
+        // 相手の手を適用
+        function applyOpponentMove(moveData) {
+            try {
+                if (moveData.drop) {
+                    // 駒打ち
+                    gameState.board[moveData.toRow][moveData.toCol] = moveData.piece;
+                    gameState.pieceOwners[moveData.toRow][moveData.toCol] = moveData.owner;
+                    
+                    // 駒台から削除
+                    const capturedArray = gameState.capturedPieces[moveData.owner];
+                    const index = capturedArray.indexOf(moveData.piece);
+                    if (index > -1) {
+                        capturedArray.splice(index, 1);
+                    }
+                } else {
+                    // 通常の移動
+                    const piece = gameState.board[moveData.fromRow][moveData.fromCol];
+                    const capturedPiece = gameState.board[moveData.toRow][moveData.toCol];
+                    
+                    // 駒を取った場合
+                    if (capturedPiece) {
+                        const originalPiece = originalPieces[capturedPiece] || capturedPiece;
+                        gameState.capturedPieces[moveData.owner].push(originalPiece);
+                    }
+                    
+                    // 成り処理
+                    const finalPiece = moveData.promoted ? promotedPieces[piece] : piece;
+                    
+                    // 盤面更新
+                    gameState.board[moveData.toRow][moveData.toCol] = finalPiece;
+                    gameState.board[moveData.fromRow][moveData.fromCol] = '';
+                    gameState.pieceOwners[moveData.toRow][moveData.toCol] = moveData.owner;
+                    gameState.pieceOwners[moveData.fromRow][moveData.fromCol] = null;
+                }
+                
+                // 棋譜更新
+                gameState.moveHistory.push(moveData);
+                gameState.turn = gameState.turn === 'sente' ? 'gote' : 'sente';
+                
+                // 王手・詰みチェック
+                const opponent = gameState.turn;
+                if (isInCheck(opponent)) {
+                    if (isCheckmate(opponent)) {
+                        const winner = opponent === 'sente' ? '後手' : '先手';
+                        showGameOver(winner + 'の勝ち！', '詰みです！');
+                        gameState.gameOver = true;
+                    } else {
+                        showNotification('王手！', 'warning');
+                        gameState.inCheck = true;
+                    }
+                } else {
+                    gameState.inCheck = false;
+                }
+                
+                // 画面更新
+                initBoard();
+                updateMoveDisplay();
+                
+                // 相手の手をハイライト
+                if (!moveData.drop) {
+                    const fromCell = document.querySelector('[data-row="' + moveData.fromRow + '"][data-col="' + moveData.fromCol + '"]');
+                    const toCell = document.querySelector('[data-row="' + moveData.toRow + '"][data-col="' + moveData.toCol + '"]');
+                    if (fromCell) fromCell.classList.add('online-move-from');
+                    if (toCell) toCell.classList.add('online-move-to');
+                }
+                
+            } catch (error) {
+                console.error('相手の手適用エラー:', error);
+            }
+        }
+        
+        // 相手に手を送信
+        function sendMoveToOpponent(moveData) {
+            if (!currentRoomRef || !onlineState.connected) return;
+            
+            try {
+                // 手データに追加情報を付与
+                const fullMoveData = {
+                    ...moveData,
+                    playerId: onlineState.playerId,
+                    owner: onlineState.playerSide,
+                    timestamp: firebase.database.ServerValue.TIMESTAMP
+                };
+                
+                // 移動データの修正
+                if (moveData.drop) {
+                    fullMoveData.toRow = parseInt(moveData.to.charAt(0));
+                    fullMoveData.toCol = parseInt(moveData.to.charAt(1));
+                } else {
+                    fullMoveData.fromRow = parseInt(moveData.from.charAt(0));
+                    fullMoveData.fromCol = parseInt(moveData.from.charAt(1));
+                    fullMoveData.toRow = parseInt(moveData.to.charAt(0));
+                    fullMoveData.toCol = parseInt(moveData.to.charAt(1));
+                }
+                
+                // Firebaseに手を送信
+                movesRef.push(fullMoveData);
+                
+                // ゲーム状態を更新
+                const updatedGameState = {
+                    board: JSON.stringify(gameState.board),
+                    turn: gameState.turn,
+                    capturedPieces: JSON.stringify(gameState.capturedPieces),
+                    moveHistory: JSON.stringify(gameState.moveHistory),
+                    gameOver: gameState.gameOver,
+                    inCheck: gameState.inCheck
+                };
+                
+                currentRoomRef.child('gameState').update(updatedGameState);
+                
+            } catch (error) {
+                console.error('手の送信エラー:', error);
+                showNotification('手の送信に失敗しました', 'error');
+            }
+        }
+        
+        // ルームから退出
+        function leaveRoom() {
+            if (onlineState.connected && currentRoomRef) {
+                try {
+                    // プレイヤー情報を削除
+                    currentRoomRef.child('players').child(onlineState.playerId).remove();
+                    
+                    // リスナーを削除
+                    currentRoomRef.off();
+                    if (movesRef) movesRef.off();
+                    if (chatRef) chatRef.off();
+                    
+                    // 状態リセット
+                    onlineState.connected = false;
+                    onlineState.roomId = null;
+                    onlineState.isHost = false;
+                    onlineState.playerSide = null;
+                    currentRoomRef = null;
+                    movesRef = null;
+                    chatRef = null;
+                    
+                    updateConnectionStatus('disconnected');
+                    showNotification('対戦から退出しました');
+                    
+                    document.getElementById('leaveRoomBtn').style.display = 'none';
+                    document.getElementById('joinRoomBtn').style.display = 'inline-block';
+                    document.getElementById('chatSection').style.display = 'none';
+                    document.getElementById('roomPassword').value = '';
+                    
+                } catch (error) {
+                    console.error('退出エラー:', error);
+                }
+            }
+        }
+        
+        // チャットメッセージ送信
+        function sendChatMessage() {
+            const input = document.getElementById('chatInput');
+            const message = input.value.trim();
+            
+            if (!message || !currentRoomRef) return;
+            
+            try {
+                const chatData = {
+                    playerId: onlineState.playerId,
+                    sender: onlineState.playerSide === 'sente' ? '先手' : '後手',
+                    message: message,
+                    timestamp: firebase.database.ServerValue.TIMESTAMP
+                };
+                
+                chatRef.push(chatData);
+                addChatMessage('あなた', message);
+                input.value = '';
+                
+            } catch (error) {
+                console.error('チャット送信エラー:', error);
+                showNotification('メッセージ送信に失敗しました', 'error');
+            }
+        }
+        
+        // チャットメッセージ追加
+        function addChatMessage(sender, message) {
+            const chatMessages = document.getElementById('chatMessages');
+            const messageElement = document.createElement('div');
+            messageElement.style.cssText = 'margin-bottom: 5px; font-size: 12px;';
+            messageElement.innerHTML = `<strong>${sender}:</strong> ${message}`;
+            
+            chatMessages.appendChild(messageElement);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+        
+        // 接続状態の更新
+        function updateConnectionStatus(status) {
+            const statusElement = document.getElementById('connectionStatus');
+            statusElement.className = 'connection-status ' + status;
+            
+            switch (status) {
+                case 'connected':
+                    statusElement.textContent = '✅ オンライン接続中';
+                    break;
+                case 'connecting':
+                    statusElement.textContent = '🔄 接続中...';
+                    break;
+                case 'disconnected':
+                default:
+                    statusElement.textContent = '❌ オフライン';
+                    break;
+            }
+        }
+        
         function handleCellClick(row, col) {
             if (gameState.gameOver) return;
             
@@ -1199,11 +1591,9 @@
             }
         }
         
-        // オンラインモードで自分の手番かチェック（Firebase版）
+        // オンラインモードで自分の手番かチェック
         function isMyTurn() {
             if (!gameState.isOnlineMode || !onlineState.connected) return true;
-            
-            // 自分の担当する手番と現在の手番が一致するかチェック
             return gameState.turn === onlineState.playerSide;
         }
         
@@ -1454,7 +1844,6 @@
             initBoard();
             updateMoveDisplay();
             
-            // AIモードで相手の番になったらAIが指す
             // CPUモードで相手の番になったらCPUが指す
             if (!gameState.gameOver && gameState.isAIMode && gameState.turn === 'gote') {
                 setTimeout(makeAIMove, 1000);
@@ -1890,296 +2279,6 @@
             gameState.selectedCapturedPiece = null;
             
             return moves;
-        }
-        
-        // オンライン対戦機能
-        function joinRoom() {
-            const roomId = document.getElementById('roomId').value.trim();
-            const password = document.getElementById('roomPassword').value.trim();
-            
-            if (!roomId || !password) {
-                showNotification('ルームIDとパスワードを入力してください', 'warning');
-                return;
-            }
-            
-            // ここで実際のサーバー接続を行う（デモでは模擬）
-            connectToServer(roomId, password);
-        }
-        
-        // ルームリスナー設定
-        function setupRoomListeners() {
-            if (!currentRoomRef) return;
-            
-            // プレイヤー接続状態監視
-            currentRoomRef.child('players').on('value', (snapshot) => {
-                const players = snapshot.val() || {};
-                const playerCount = Object.keys(players).length;
-                
-                if (playerCount === 2 && !document.getElementById('chatSection').style.display) {
-                    document.getElementById('chatSection').style.display = 'block';
-                    showNotification('対戦相手が参加しました！', 'info');
-                }
-            });
-            
-            // ゲーム状態変更監視
-            currentRoomRef.child('gameState').on('value', (snapshot) => {
-                const newGameState = snapshot.val();
-                if (newGameState) {
-                    syncGameState(newGameState);
-                }
-            });
-            
-            // 手の変更監視
-            movesRef = currentRoomRef.child('moves');
-            movesRef.on('child_added', (snapshot) => {
-                const moveData = snapshot.val();
-                if (moveData.playerId !== onlineState.playerId) {
-                    // 相手の手を適用
-                    applyOpponentMove(moveData);
-                }
-            });
-            
-            // チャット監視
-            chatRef = currentRoomRef.child('chat');
-            chatRef.on('child_added', (snapshot) => {
-                const chatData = snapshot.val();
-                if (chatData.playerId !== onlineState.playerId) {
-                    addChatMessage(chatData.sender, chatData.message);
-                }
-            });
-            
-            // 切断検知
-            currentRoomRef.child('players').child(onlineState.playerId).onDisconnect().remove();
-        }
-        
-        // ゲーム状態同期
-        function syncGameState(newGameState) {
-            try {
-                gameState.board = JSON.parse(newGameState.board);
-                gameState.turn = newGameState.turn;
-                gameState.capturedPieces = JSON.parse(newGameState.capturedPieces);
-                gameState.moveHistory = JSON.parse(newGameState.moveHistory);
-                gameState.gameOver = newGameState.gameOver;
-                gameState.inCheck = newGameState.inCheck;
-                
-                // 駒の所有者を再計算
-                initPieceOwners();
-                initBoard();
-                updateMoveDisplay();
-            } catch (error) {
-                console.error('ゲーム状態同期エラー:', error);
-            }
-        }
-        
-        // 相手の手を適用
-        function applyOpponentMove(moveData) {
-            try {
-                if (moveData.drop) {
-                    // 駒打ち
-                    gameState.board[moveData.toRow][moveData.toCol] = moveData.piece;
-                    gameState.pieceOwners[moveData.toRow][moveData.toCol] = moveData.owner;
-                    
-                    // 駒台から削除
-                    const capturedArray = gameState.capturedPieces[moveData.owner];
-                    const index = capturedArray.indexOf(moveData.piece);
-                    if (index > -1) {
-                        capturedArray.splice(index, 1);
-                    }
-                } else {
-                    // 通常の移動
-                    const piece = gameState.board[moveData.fromRow][moveData.fromCol];
-                    const capturedPiece = gameState.board[moveData.toRow][moveData.toCol];
-                    
-                    // 駒を取った場合
-                    if (capturedPiece) {
-                        const originalPiece = originalPieces[capturedPiece] || capturedPiece;
-                        gameState.capturedPieces[moveData.owner].push(originalPiece);
-                    }
-                    
-                    // 成り処理
-                    const finalPiece = moveData.promoted ? promotedPieces[piece] : piece;
-                    
-                    // 盤面更新
-                    gameState.board[moveData.toRow][moveData.toCol] = finalPiece;
-                    gameState.board[moveData.fromRow][moveData.fromCol] = '';
-                    gameState.pieceOwners[moveData.toRow][moveData.toCol] = moveData.owner;
-                    gameState.pieceOwners[moveData.fromRow][moveData.fromCol] = null;
-                }
-                
-                // 棋譜更新
-                gameState.moveHistory.push(moveData);
-                gameState.turn = gameState.turn === 'sente' ? 'gote' : 'sente';
-                
-                // 王手・詰みチェック
-                const opponent = gameState.turn;
-                if (isInCheck(opponent)) {
-                    if (isCheckmate(opponent)) {
-                        const winner = opponent === 'sente' ? '後手' : '先手';
-                        showGameOver(winner + 'の勝ち！', '詰みです！');
-                        gameState.gameOver = true;
-                    } else {
-                        showNotification('王手！', 'warning');
-                        gameState.inCheck = true;
-                    }
-                } else {
-                    gameState.inCheck = false;
-                }
-                
-                // 画面更新
-                initBoard();
-                updateMoveDisplay();
-                
-                // 相手の手をハイライト
-                if (!moveData.drop) {
-                    const fromCell = document.querySelector('[data-row="' + moveData.fromRow + '"][data-col="' + moveData.fromCol + '"]');
-                    const toCell = document.querySelector('[data-row="' + moveData.toRow + '"][data-col="' + moveData.toCol + '"]');
-                    if (fromCell) fromCell.classList.add('online-move-from');
-                    if (toCell) toCell.classList.add('online-move-to');
-                }
-                
-            } catch (error) {
-                console.error('相手の手適用エラー:', error);
-            }
-        }
-        
-        // ルームから退出
-        function leaveRoom() {
-            if (onlineState.connected) {
-                // 実際の実装では切断処理
-                onlineState.connected = false;
-                onlineState.roomId = null;
-                onlineState.isHost = false;
-                
-                updateConnectionStatus('disconnected');
-                showNotification('対戦から退出しました');
-                
-                document.getElementById('leaveRoomBtn').style.display = 'none';
-                document.getElementById('chatSection').style.display = 'none';
-                document.getElementById('roomPassword').value = ''; // パスワード欄をクリア
-            }
-        }
-        
-        // 接続状態の更新
-        function updateConnectionStatus(status) {
-            const statusElement = document.getElementById('connectionStatus');
-            statusElement.className = 'connection-status ' + status;
-            
-            switch (status) {
-                case 'connected':
-                    statusElement.textContent = '✅ オンライン接続中';
-                    break;
-                case 'connecting':
-                    statusElement.textContent = '🔄 接続中...';
-                    break;
-                case 'disconnected':
-                default:
-                    statusElement.textContent = '❌ オフライン';
-                    break;
-            }
-        }
-        
-        // 相手に手を送信（Firebase版）
-        function sendMoveToOpponent(moveData) {
-            if (!currentRoomRef || !onlineState.connected) return;
-            
-            try {
-                // 手データに追加情報を付与
-                const fullMoveData = {
-                    ...moveData,
-                    playerId: onlineState.playerId,
-                    owner: onlineState.playerSide,
-                    timestamp: firebase.database.ServerValue.TIMESTAMP
-                };
-                
-                // Firebaseに手を送信
-                movesRef.push(fullMoveData);
-                
-                // ゲーム状態を更新
-                const updatedGameState = {
-                    board: JSON.stringify(gameState.board),
-                    turn: gameState.turn,
-                    capturedPieces: JSON.stringify(gameState.capturedPieces),
-                    moveHistory: JSON.stringify(gameState.moveHistory),
-                    gameOver: gameState.gameOver,
-                    inCheck: gameState.inCheck
-                };
-                
-                currentRoomRef.child('gameState').update(updatedGameState);
-                
-            } catch (error) {
-                console.error('手の送信エラー:', error);
-                showNotification('手の送信に失敗しました', 'error');
-            }
-        }
-        
-        // ルームから退出（Firebase版）
-        function leaveRoom() {
-            if (onlineState.connected && currentRoomRef) {
-                try {
-                    // プレイヤー情報を削除
-                    currentRoomRef.child('players').child(onlineState.playerId).remove();
-                    
-                    // リスナーを削除
-                    currentRoomRef.off();
-                    if (movesRef) movesRef.off();
-                    if (chatRef) chatRef.off();
-                    
-                    // 状態リセット
-                    onlineState.connected = false;
-                    onlineState.roomId = null;
-                    onlineState.isHost = false;
-                    onlineState.playerSide = null;
-                    currentRoomRef = null;
-                    movesRef = null;
-                    chatRef = null;
-                    
-                    updateConnectionStatus('disconnected');
-                    showNotification('対戦から退出しました');
-                    
-                    document.getElementById('leaveRoomBtn').style.display = 'none';
-                    document.getElementById('chatSection').style.display = 'none';
-                    document.getElementById('roomPassword').value = '';
-                    
-                } catch (error) {
-                    console.error('退出エラー:', error);
-                }
-            }
-        }
-        
-        // チャットメッセージ送信（Firebase版）
-        function sendChatMessage() {
-            const input = document.getElementById('chatInput');
-            const message = input.value.trim();
-            
-            if (!message || !currentRoomRef) return;
-            
-            try {
-                const chatData = {
-                    playerId: onlineState.playerId,
-                    sender: onlineState.playerSide === 'sente' ? '先手' : '後手',
-                    message: message,
-                    timestamp: firebase.database.ServerValue.TIMESTAMP
-                };
-                
-                chatRef.push(chatData);
-                addChatMessage('あなた', message);
-                input.value = '';
-                
-            } catch (error) {
-                console.error('チャット送信エラー:', error);
-                showNotification('メッセージ送信に失敗しました', 'error');
-            }
-        }
-        
-        // チャットメッセージ追加
-        function addChatMessage(sender, message) {
-            const chatMessages = document.getElementById('chatMessages');
-            const messageElement = document.createElement('div');
-            messageElement.style.cssText = 'margin-bottom: 5px; font-size: 12px;';
-            messageElement.innerHTML = `<strong>${sender}:</strong> ${message}`;
-            
-            chatMessages.appendChild(messageElement);
-            chatMessages.scrollTop = chatMessages.scrollHeight;
         }
         
         // ゲーム終了表示

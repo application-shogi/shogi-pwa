@@ -496,6 +496,108 @@
         }
     </style>
 </head>
+    <!-- 既存のindex.htmlに追加するコード -->
+<!-- ヘッダーまたはメイン部分の適切な場所に挿入 -->
+
+<div class="online-game-promotion" style="
+    text-align: center;
+    margin: 30px 0;
+    padding: 25px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 15px;
+    box-shadow: 0 8px 32px rgba(102, 126, 234, 0.3);
+    color: white;
+">
+    <h2 style="margin: 0 0 15px 0; font-size: 24px;">
+        🌐 オンライン対戦機能
+    </h2>
+    <p style="margin: 0 0 20px 0; font-size: 16px; opacity: 0.9;">
+        友達とリアルタイム将棋対戦！パスワードを決めて安全に対戦できます
+    </p>
+    
+    <!-- メインボタン -->
+    <a href="online.html" class="online-game-btn" style="
+        display: inline-block;
+        padding: 15px 30px;
+        background: rgba(255, 255, 255, 0.2);
+        border: 2px solid rgba(255, 255, 255, 0.3);
+        color: white;
+        text-decoration: none;
+        border-radius: 50px;
+        font-size: 18px;
+        font-weight: bold;
+        backdrop-filter: blur(10px);
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    " onmouseover="
+        this.style.background='rgba(255, 255, 255, 0.3)';
+        this.style.transform='translateY(-2px)';
+        this.style.boxShadow='0 6px 20px rgba(0, 0, 0, 0.3)';
+    " onmouseout="
+        this.style.background='rgba(255, 255, 255, 0.2)';
+        this.style.transform='translateY(0)';
+        this.style.boxShadow='0 4px 15px rgba(0, 0, 0, 0.2)';
+    ">
+        🚀 オンライン対戦を始める
+    </a>
+    
+    <!-- 機能紹介 -->
+    <div style="
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 20px;
+        margin-top: 25px;
+    ">
+        <div style="text-align: center;">
+            <div style="font-size: 32px; margin-bottom: 8px;">🔒</div>
+            <strong>パスワード制</strong><br>
+            <small style="opacity: 0.8;">友達と同じパスワードで安全対戦</small>
+        </div>
+        <div style="text-align: center;">
+            <div style="font-size: 32px; margin-bottom: 8px;">⚡</div>
+            <strong>リアルタイム</strong><br>
+            <small style="opacity: 0.8;">指し手が瞬時に同期</small>
+        </div>
+        <div style="text-align: center;">
+            <div style="font-size: 32px; margin-bottom: 8px;">💬</div>
+            <strong>チャット機能</strong><br>
+            <small style="opacity: 0.8;">対戦中の会話も楽しめる</small>
+        </div>
+        <div style="text-align: center;">
+            <div style="font-size: 32px; margin-bottom: 8px;">📱</div>
+            <strong>どこでも対戦</strong><br>
+            <small style="opacity: 0.8;">PC・スマホ問わず対戦可能</small>
+        </div>
+    </div>
+</div>
+
+<!-- レスポンシブ対応のスタイル追加 -->
+<style>
+@media (max-width: 768px) {
+    .online-game-promotion {
+        margin: 20px 10px !important;
+        padding: 20px 15px !important;
+    }
+    
+    .online-game-promotion h2 {
+        font-size: 20px !important;
+    }
+    
+    .online-game-promotion p {
+        font-size: 14px !important;
+    }
+    
+    .online-game-btn {
+        padding: 12px 24px !important;
+        font-size: 16px !important;
+    }
+    
+    .online-game-promotion > div:last-child {
+        grid-template-columns: repeat(2, 1fr) !important;
+        gap: 15px !important;
+    }
+}
+</style>
 <body>
     <div class="header">
         <h1>🏯 将棋 AI対戦</h1>

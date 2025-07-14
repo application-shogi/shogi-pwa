@@ -335,34 +335,12 @@
         </div>
     </div>
 
-    <script type="module">
-        // Firebase SDKの読み込み
-        let firebaseApp, db;
-        let initializeApp, getFirestore, doc, setDoc, getDoc, updateDoc, onSnapshot, serverTimestamp, arrayUnion;
-        
-        try {
-            // Firebase モジュールのインポート
-            const firebaseModules = await import('https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js');
-            const firestoreModules = await import('https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js');
-            
-            initializeApp = firebaseModules.initializeApp;
-            getFirestore = firestoreModules.getFirestore;
-            doc = firestoreModules.doc;
-            setDoc = firestoreModules.setDoc;
-            getDoc = firestoreModules.getDoc;
-            updateDoc = firestoreModules.updateDoc;
-            onSnapshot = firestoreModules.onSnapshot;
-            serverTimestamp = firestoreModules.serverTimestamp;
-            arrayUnion = firestoreModules.arrayUnion;
-            
-            updateFirebaseStatus('SDKロード完了');
-            
-        } catch (error) {
-            console.error('Firebase SDK読み込みエラー:', error);
-            updateFirebaseStatus('Firebase SDK読み込み失敗: ' + error.message);
-        }
+    <!-- Firebase SDK - CSP対応版 -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
 
-        // Firebase設定
+    <script>
+        // Firebase設定 - compat版を使用
         const firebaseConfig = {
             apiKey: "AIzaSyBj58MkqswywncKrifsD5RyG68CuqkGQKQ",
             authDomain: "my-shogi-online.firebaseapp.com",
@@ -374,39 +352,47 @@
         };
 
         // Firebase初期化
+        let app, db;
+        let isFirebaseReady = false;
+
         try {
-            firebaseApp = initializeApp(firebaseConfig);
-            db = getFirestore(firebaseApp);
-            
+            app = firebase.initializeApp(firebaseConfig);
+            db = firebase.firestore();
+            isFirebaseReady = true;
             updateFirebaseStatus('Firebase接続成功');
-            updateGameStatus('オフライン（ローカル対戦モード）');
             
             // 接続テスト
-            await testFirebaseConnection();
+            testFirebaseConnection();
             
         } catch (error) {
             console.error('Firebase初期化エラー:', error);
             updateFirebaseStatus('Firebase初期化失敗: ' + error.message);
-            updateGameStatus('Firebase接続エラー');
+        }
+        
+        function updateFirebaseStatus(message) {
+            const statusElement = document.getElementById('firebase-status');
+            if (statusElement) {
+                statusElement.textContent = 'Firebase: ' + message;
+            }
+            console.log('Firebase Status:', message);
         }
         
         // Firebase接続テスト
         async function testFirebaseConnection() {
             try {
-                const testRef = doc(db, 'test', 'connection_test');
-                await setDoc(testRef, {
-                    timestamp: serverTimestamp(),
+                await db.collection('test').doc('connection_test').set({
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
                     message: 'connection test'
                 });
                 
                 updateFirebaseStatus('Firebase接続テスト成功');
                 enableJoinButton();
+                updateGameStatus('オフライン（ローカル対戦モード）');
                 
             } catch (error) {
                 console.error('Firebase接続テストエラー:', error);
                 updateFirebaseStatus('Firebase接続テスト失敗: ' + error.message);
                 
-                // セキュリティルールの問題を示唆
                 if (error.code === 'permission-denied') {
                     updateFirebaseStatus('エラー: Firebaseセキュリティルールの設定が必要です');
                     showStatus('Firebaseのセキュリティルールを設定してください', 'error');
@@ -414,15 +400,12 @@
             }
         }
         
-        function updateFirebaseStatus(message) {
-            document.getElementById('firebase-status').textContent = 'Firebase: ' + message;
-            console.log('Firebase Status:', message);
-        }
-        
         function enableJoinButton() {
             const joinBtn = document.getElementById('join-room-btn');
-            joinBtn.disabled = false;
-            joinBtn.textContent = '部屋に参加';
+            if (joinBtn) {
+                joinBtn.disabled = false;
+                joinBtn.textContent = '部屋に参加';
+            }
         }
 
         // ゲーム状態変数
@@ -449,24 +432,38 @@
 
         // 盤面初期化
         function initializeBoard() {
-            board = Array(9).fill().map(() => Array(9).fill(null));
+            console.log('盤面初期化開始');
             
-            // 後手の駒配置
-            board[0] = ['l', 'n', 's', 'g', 'k', 'g', 's', 'n', 'l'];
-            board[1] = [null, 'r', null, null, null, null, null, 'b', null];
-            board[2] = ['p', 'p', 'p', 'p', 'p', 'p', 'p', 'p', 'p'];
-            
-            // 先手の駒配置
-            board[6] = ['P', 'P', 'P', 'P', 'P', 'P', 'P', 'P', 'P'];
-            board[7] = [null, 'B', null, null, null, null, null, 'R', null];
-            board[8] = ['L', 'N', 'S', 'G', 'K', 'G', 'S', 'N', 'L'];
-            
-            renderBoard();
+            try {
+                board = Array(9).fill().map(() => Array(9).fill(null));
+                
+                // 後手の駒配置
+                board[0] = ['l', 'n', 's', 'g', 'k', 'g', 's', 'n', 'l'];
+                board[1] = [null, 'r', null, null, null, null, null, 'b', null];
+                board[2] = ['p', 'p', 'p', 'p', 'p', 'p', 'p', 'p', 'p'];
+                
+                // 先手の駒配置
+                board[6] = ['P', 'P', 'P', 'P', 'P', 'P', 'P', 'P', 'P'];
+                board[7] = [null, 'B', null, null, null, null, null, 'R', null];
+                board[8] = ['L', 'N', 'S', 'G', 'K', 'G', 'S', 'N', 'L'];
+                
+                renderBoard();
+                console.log('盤面初期化完了');
+                
+            } catch (error) {
+                console.error('盤面初期化エラー:', error);
+                showStatus('盤面初期化エラー: ' + error.message, 'error');
+            }
         }
 
         // 盤面描画
         function renderBoard() {
             const boardElement = document.getElementById('shogi-board');
+            if (!boardElement) {
+                console.error('将棋盤要素が見つかりません');
+                return;
+            }
+            
             boardElement.innerHTML = '';
             
             for (let row = 0; row < 9; row++) {
@@ -482,7 +479,10 @@
                         square.style.color = piece === piece.toUpperCase() ? '#8B0000' : '#000080';
                     }
                     
-                    square.addEventListener('click', () => handleSquareClick(row, col));
+                    square.addEventListener('click', function() {
+                        handleSquareClick(row, col);
+                    });
+                    
                     boardElement.appendChild(square);
                 }
             }
@@ -499,7 +499,7 @@
 
             if (selectedSquare === null) {
                 if (board[row][col] && canSelectPiece(board[row][col])) {
-                    selectedSquare = { row, col };
+                    selectedSquare = { row: row, col: col };
                     highlightSquare(row, col, 'selected');
                     showPossibleMoves(row, col);
                 }
@@ -516,7 +516,7 @@
                     clearHighlights();
                     selectedSquare = null;
                     if (board[row][col] && canSelectPiece(board[row][col])) {
-                        selectedSquare = { row, col };
+                        selectedSquare = { row: row, col: col };
                         highlightSquare(row, col, 'selected');
                         showPossibleMoves(row, col);
                     }
@@ -558,7 +558,7 @@
         }
 
         function highlightSquare(row, col, className) {
-            const square = document.querySelector(`[data-row="${row}"][data-col="${col}"]`);
+            const square = document.querySelector('[data-row="' + row + '"][data-col="' + col + '"]');
             if (square) {
                 square.classList.add(className);
             }
@@ -580,18 +580,25 @@
         }
 
         function clearHighlights() {
-            document.querySelectorAll('.square').forEach(square => {
-                square.classList.remove('selected', 'possible-move');
-            });
+            const squares = document.querySelectorAll('.square');
+            for (let i = 0; i < squares.length; i++) {
+                squares[i].classList.remove('selected', 'possible-move');
+            }
         }
 
         function updateTurnDisplay() {
             const turnText = currentPlayer === 'sente' ? '先手' : '後手';
-            document.getElementById('turn-display').textContent = `現在の手番: ${turnText}`;
+            const element = document.getElementById('turn-display');
+            if (element) {
+                element.textContent = '現在の手番: ' + turnText;
+            }
         }
 
         function updateGameStatus(message) {
-            document.getElementById('game-status').textContent = message;
+            const element = document.getElementById('game-status');
+            if (element) {
+                element.textContent = message;
+            }
         }
 
         function isMyTurn() {
@@ -610,7 +617,7 @@
                 return;
             }
             
-            if (!db) {
+            if (!isFirebaseReady) {
                 showStatus('Firebaseが初期化されていません', 'error');
                 return;
             }
@@ -621,10 +628,10 @@
                 onlineGame.roomPassword = password;
                 onlineGame.playerName = playerName;
                 
-                const roomRef = doc(db, 'rooms', password);
-                const roomDoc = await getDoc(roomRef);
+                const roomRef = db.collection('rooms').doc(password);
+                const roomDoc = await roomRef.get();
                 
-                if (!roomDoc.exists()) {
+                if (!roomDoc.exists) {
                     await createRoom(password, playerName);
                 } else {
                     await joinExistingRoom(roomDoc.data(), playerName);
@@ -651,7 +658,7 @@
                     sente: {
                         id: onlineGame.playerId,
                         name: playerName,
-                        joinedAt: serverTimestamp()
+                        joinedAt: firebase.firestore.FieldValue.serverTimestamp()
                     },
                     gote: null
                 },
@@ -659,12 +666,12 @@
                 currentTurn: 'sente',
                 moves: [],
                 gameStatus: 'waiting',
-                createdAt: serverTimestamp(),
+                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
                 chat: []
             };
 
-            await setDoc(doc(db, 'rooms', password), roomData);
-            showGameInfo({ side: 'sente', message: `部屋「${password}」を作成しました。相手を待っています...` });
+            await db.collection('rooms').doc(password).set(roomData);
+            showGameInfo({ side: 'sente', message: '部屋「' + password + '」を作成しました。相手を待っています...' });
         }
 
         async function joinExistingRoom(roomData, playerName) {
@@ -674,38 +681,36 @@
             
             onlineGame.playerSide = 'gote';
             
-            const roomRef = doc(db, 'rooms', onlineGame.roomPassword);
-            await updateDoc(roomRef, {
+            await db.collection('rooms').doc(onlineGame.roomPassword).update({
                 'players.gote': {
                     id: onlineGame.playerId,
                     name: playerName,
-                    joinedAt: serverTimestamp()
+                    joinedAt: firebase.firestore.FieldValue.serverTimestamp()
                 },
                 gameStatus: 'playing',
-                gameStartedAt: serverTimestamp()
+                gameStartedAt: firebase.firestore.FieldValue.serverTimestamp()
             });
 
             showGameInfo({ 
                 side: 'gote', 
-                message: `部屋「${onlineGame.roomPassword}」に参加しました。ゲーム開始！`,
+                message: '部屋「' + onlineGame.roomPassword + '」に参加しました。ゲーム開始！',
                 opponent: roomData.players.sente.name 
             });
         }
 
         function listenToRoom() {
-            const roomRef = doc(db, 'rooms', onlineGame.roomPassword);
-            
-            onlineGame.gameListener = onSnapshot(roomRef, (docSnap) => {
-                if (docSnap.exists()) {
-                    const roomData = docSnap.data();
-                    handleRoomUpdate(roomData);
-                } else {
-                    showStatus('部屋が見つかりません', 'error');
-                }
-            }, (error) => {
-                console.error('部屋監視エラー:', error);
-                showStatus('部屋の監視でエラーが発生しました: ' + error.message, 'error');
-            });
+            onlineGame.gameListener = db.collection('rooms').doc(onlineGame.roomPassword)
+                .onSnapshot(function(doc) {
+                    if (doc.exists) {
+                        const roomData = doc.data();
+                        handleRoomUpdate(roomData);
+                    } else {
+                        showStatus('部屋が見つかりません', 'error');
+                    }
+                }, function(error) {
+                    console.error('部屋監視エラー:', error);
+                    showStatus('部屋の監視でエラーが発生しました: ' + error.message, 'error');
+                });
 
             onlineGame.isOnline = true;
             gameMode = 'online';
@@ -741,15 +746,14 @@
                     from: { row: fromRow, col: fromCol },
                     to: { row: toRow, col: toCol },
                     player: onlineGame.playerSide,
-                    timestamp: serverTimestamp()
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
                 };
 
-                const roomRef = doc(db, 'rooms', onlineGame.roomPassword);
-                await updateDoc(roomRef, {
-                    moves: arrayUnion(move),
+                await db.collection('rooms').doc(onlineGame.roomPassword).update({
+                    moves: firebase.firestore.FieldValue.arrayUnion(move),
                     currentTurn: currentPlayer,
                     board: boardToSfen(),
-                    lastMoveAt: serverTimestamp()
+                    lastMoveAt: firebase.firestore.FieldValue.serverTimestamp()
                 });
                 
             } catch (error) {
@@ -784,12 +788,11 @@
                     player: onlineGame.playerSide,
                     playerName: onlineGame.playerName,
                     message: message,
-                    timestamp: serverTimestamp()
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
                 };
 
-                const roomRef = doc(db, 'rooms', onlineGame.roomPassword);
-                await updateDoc(roomRef, {
-                    chat: arrayUnion(chatMessage)
+                await db.collection('rooms').doc(onlineGame.roomPassword).update({
+                    chat: firebase.firestore.FieldValue.arrayUnion(chatMessage)
                 });
 
                 input.value = '';
@@ -807,14 +810,13 @@
                 try {
                     const winner = onlineGame.playerSide === 'sente' ? 'gote' : 'sente';
                     
-                    const roomRef = doc(db, 'rooms', onlineGame.roomPassword);
-                    await updateDoc(roomRef, {
+                    await db.collection('rooms').doc(onlineGame.roomPassword).update({
                         gameStatus: 'finished',
                         result: {
                             winner: winner,
                             loser: onlineGame.playerSide,
                             reason: 'resignation',
-                            finishedAt: serverTimestamp()
+                            finishedAt: firebase.firestore.FieldValue.serverTimestamp()
                         }
                     });
                     
@@ -863,7 +865,10 @@
         }
 
         function updateOnlineTurnDisplay(turn) {
-            document.getElementById('current-turn-online').textContent = turn === 'sente' ? '先手' : '後手';
+            const element = document.getElementById('current-turn-online');
+            if (element) {
+                element.textContent = turn === 'sente' ? '先手' : '後手';
+            }
         }
 
         function updateOnlineGameStatus(status) {
@@ -879,9 +884,9 @@
             
             // 重複チェック
             const existingMessages = chatMessages.querySelectorAll('div');
-            const messageText = `${message.playerName}: ${message.message}`;
-            for (let msg of existingMessages) {
-                if (msg.textContent.includes(messageText)) {
+            const messageText = message.playerName + ': ' + message.message;
+            for (let i = 0; i < existingMessages.length; i++) {
+                if (existingMessages[i].textContent.includes(messageText)) {
                     return; // 既に表示済み
                 }
             }
@@ -889,13 +894,11 @@
             const messageDiv = document.createElement('div');
             const time = new Date().toLocaleTimeString();
             
-            messageDiv.innerHTML = `
-                <span style="color: #666; font-size: 10px;">${time}</span>
-                <strong style="color: ${message.player === 'sente' ? '#8B0000' : '#000080'};">
-                    ${message.playerName}:
-                </strong>
-                ${message.message}
-            `;
+            messageDiv.innerHTML = 
+                '<span style="color: #666; font-size: 10px;">' + time + '</span> ' +
+                '<strong style="color: ' + (message.player === 'sente' ? '#8B0000' : '#000080') + ';">' +
+                message.playerName + ':</strong> ' +
+                message.message;
             
             chatMessages.appendChild(messageDiv);
             chatMessages.scrollTop = chatMessages.scrollHeight;
@@ -905,12 +908,12 @@
             const statusDiv = document.getElementById('status-messages');
             const messageDiv = document.createElement('div');
             
-            messageDiv.className = `status-message status-${type}`;
+            messageDiv.className = 'status-message status-' + type;
             messageDiv.textContent = message;
             
             statusDiv.appendChild(messageDiv);
             
-            setTimeout(() => {
+            setTimeout(function() {
                 if (messageDiv.parentNode) {
                     messageDiv.remove();
                 }
@@ -918,21 +921,22 @@
         }
 
         // イベントリスナー設定
-        document.addEventListener('DOMContentLoaded', () => {
+        document.addEventListener('DOMContentLoaded', function() {
+            // 盤面初期化
+            initializeBoard();
+            updateTurnDisplay();
+            
+            // イベントリスナー
             document.getElementById('join-room-btn').addEventListener('click', joinRoom);
             document.getElementById('resign-btn').addEventListener('click', resign);
             document.getElementById('leave-room-btn').addEventListener('click', leaveRoom);
             document.getElementById('send-chat-btn').addEventListener('click', sendChatMessage);
             
-            document.getElementById('chat-input').addEventListener('keypress', (event) => {
+            document.getElementById('chat-input').addEventListener('keypress', function(event) {
                 if (event.key === 'Enter') {
                     sendChatMessage();
                 }
             });
-
-            // 初期化
-            initializeBoard();
-            updateTurnDisplay();
         });
 
     </script>

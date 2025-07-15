@@ -917,8 +917,8 @@
                     '龍': { image: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHZpZXdCb3g9IjAgMCA0MCA0MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48dGV4dCB4PSIyMCIgeT0iMjUiIGZpbGw9IiNmZjY5YjQiIGZvbnQtc2l6ZT0iMjQiIHRleHQtYW5jaG9yPSJtaWRkbGUiPvCfkJI8L3RleHQ+PC9zdmc+', name: 'ドラゴン猫' },
                     '馬': { image: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHZpZXdCb3g9IjAgMCA0MCA0MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48dGV4dCB4PSIyMCIgeT0iMjUiIGZpbGw9IiNmZjY5YjQiIGZvbnQtc2l6ZT0iMjQiIHRleHQtYW5jaG9yPSJtaWRkbGUiPvCfpYQ8L3RleHQ+PC9zdmc+', name: 'ユニコーン猫' },
                     '杏': { image: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHZpZXdCb3g9IjAgMCA0MCA0MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48dGV4dCB4PSIyMCIgeT0iMjUiIGZpbGw9IiNmZmQ3MDAiIGZvbnQtc2l6ZT0iMjQiIHRleHQtYW5jaG9yPSJtaWRkbGUiPvCfjLw8L3RleHQ+PC9zdmc+', name: '花猫' },
-                    '圭': { image: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHZpZXdCb3g9IjAgMCA0MCA0MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48dGV4dCB4PSIyMCIgeT0iMjUiIGZpbGw9IiNmZmQ3MDAiIGZvbnQtc2l6ZT0iMjQiIHRleHQtYW5jaG9yPSJtaWRkbGUiPvCfkos8L3RleHQ+PC9zdmc+', name: '戦士猫' },
-                    '全': { image: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHZpZXdCb3g9IjAgMCA0MCA0MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48dGV4dCB4PSIyMCIgeT0iMjUiIGZpbGw9IiNmZmQ3MDAiIGZvbnQtc2l6ZT0iMjQiIHRleHQtYW5jaG9yPSJtaWRkbGUiPvCfkos8L3RleHQ+PC9zdmc+', name: 'ダイヤ猫' }
+                    '圭': { image: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHZpZXdCb3g9IjAgMCA0MCA0MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48dGV4dCB4PSIyMCIgeT0iMjUiIGZpbGw9IiNmZmQ3MDAiIGZvbnQtc2l6ZT0iMjQiIHRleHQtYW5jaG9yPSJtaWRkbGUiPvCfkIs8L3RleHQ+PC9zdmc+', name: '戦士猫' },
+                    '全': { image: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHZpZXdCb3g9IjAgMCA0MCA0MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48dGV4dCB4PSIyMCIgeT0iMjUiIGZpbGw9IiNmZmQ3MDAiIGZvbnQtc2l6ZT0iMjQiIHRleHQtYW5jaG9yPSJtaWRkbGUiPvCfkIs8L3RleHQ+PC9zdmc+', name: 'ダイヤ猫' }
                 },
                 
                 // Firebase設定（実際の設定に更新）
@@ -1609,12 +1609,17 @@
                 
                 this.gameState.moveHistory.push(moveData);
                 
+                // ★重要: 手番を切り替える前に現在の手番を保存
+                const currentTurn = this.gameState.turn;
+                
+                // 手番を切り替え
+                this.gameState.turn = this.gameState.turn === 'sente' ? 'gote' : 'sente';
+                
                 // オンラインモードの場合、相手に送信
                 if (this.gameState.isOnlineMode && this.onlineState.connected) {
-                    this.sendMoveToOpponent(moveData);
+                    // ★修正: 切り替え後の手番を送信するようにsendMoveToOpponentを呼び出す
+                    this.sendMoveToOpponent(moveData, currentTurn);
                 }
-                
-                this.gameState.turn = this.gameState.turn === 'sente' ? 'gote' : 'sente';
                 
                 // 王手・詰みチェック
                 this.checkGameStatus();
@@ -1644,13 +1649,18 @@
                 
                 this.gameState.moveHistory.push(moveData);
                 
-                // オンラインモードの場合、相手に送信
-                if (this.gameState.isOnlineMode && this.onlineState.connected) {
-                    this.sendMoveToOpponent(moveData);
-                }
+                // ★重要: 手番を切り替える前に現在の手番を保存
+                const currentTurn = this.gameState.turn;
                 
+                // 手番を切り替え
                 this.gameState.turn = this.gameState.turn === 'sente' ? 'gote' : 'sente';
                 this.gameState.selectedCapturedPiece = null;
+                
+                // オンラインモードの場合、相手に送信
+                if (this.gameState.isOnlineMode && this.onlineState.connected) {
+                    // ★修正: 切り替え後の手番を送信するようにsendMoveToOpponentを呼び出す
+                    this.sendMoveToOpponent(moveData, currentTurn);
+                }
                 
                 // 王手・詰みチェック
                 this.checkGameStatus();
@@ -2040,14 +2050,16 @@
             isMyTurn() {
                 if (!this.gameState.isOnlineMode || !this.onlineState.connected) return true;
                 
+                const result = this.gameState.turn === this.onlineState.playerSide;
+                
                 // デバッグ用ログ
                 console.log('手番チェック:', {
                     currentTurn: this.gameState.turn,
                     playerSide: this.onlineState.playerSide,
-                    isMyTurn: this.gameState.turn === this.onlineState.playerSide
+                    isMyTurn: result
                 });
                 
-                return this.gameState.turn === this.onlineState.playerSide;
+                return result;
             },
             
             isPieceOwnedByCurrentPlayer(row, col) {
@@ -2253,7 +2265,8 @@
                         currentMoveCount: this.gameState.moveHistory.length,
                         newMoveCount: JSON.parse(newGameState.moveHistory).length,
                         currentTurn: this.gameState.turn,
-                        newTurn: newGameState.turn,
+                        newTurn: newGameState.turn,  // Firebaseから受け取った手番
+                        lastTurn: newGameState.lastTurn,  // 最後に指した側
                         playerSide: this.onlineState.playerSide
                     });
                     
@@ -2282,9 +2295,9 @@
                         }
                     }
                     
-                    // ゲーム状態を完全に同期（手番も含めて常に同期）
+                    // ★重要: ゲーム状態を完全に同期（手番も含めて常に同期）
                     this.gameState.board = JSON.parse(newGameState.board);
-                    this.gameState.turn = newGameState.turn;
+                    this.gameState.turn = newGameState.turn;  // Firebaseの手番を確実に適用
                     this.gameState.capturedPieces = JSON.parse(newGameState.capturedPieces);
                     this.gameState.moveHistory = newMoveHistory;
                     this.gameState.gameOver = newGameState.gameOver;
@@ -2327,7 +2340,7 @@
                 if (toCell) toCell.classList.add('online-move-to');
             },
             
-            sendMoveToOpponent(moveData) {
+            sendMoveToOpponent(moveData, playedBy = null) {
                 if (!this.firebase.currentRoomRef || !this.onlineState.connected) return;
                 
                 try {
@@ -2352,20 +2365,22 @@
                         fullMoveData.toCol = parseInt(moveData.to.charAt(1));
                     }
                     
-                    // ゲーム状態を更新（手番も含めて）
+                    // ★重要: ゲーム状態を更新（現在の手番を正しく送信）
                     const updatedGameState = {
                         board: JSON.stringify(this.gameState.board),
-                        turn: this.gameState.turn,
+                        turn: this.gameState.turn,  // ★これは既に切り替わった後の手番（次の手番）
                         capturedPieces: JSON.stringify(this.gameState.capturedPieces),
                         moveHistory: JSON.stringify(this.gameState.moveHistory),
                         gameOver: this.gameState.gameOver,
                         inCheck: this.gameState.inCheck,
                         lastUpdated: firebase.database.ServerValue.TIMESTAMP,
-                        lastPlayer: this.onlineState.playerId
+                        lastPlayer: this.onlineState.playerId,
+                        lastTurn: playedBy || this.onlineState.playerSide  // ★誰が指したかを記録
                     };
                     
                     console.log('Firebase更新データ:', {
-                        turn: updatedGameState.turn,
+                        turn: updatedGameState.turn,  // 次の手番
+                        lastTurn: updatedGameState.lastTurn,  // 今指した側
                         moveCount: this.gameState.moveHistory.length,
                         lastPlayer: this.onlineState.playerId
                     });

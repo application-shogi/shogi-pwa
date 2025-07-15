@@ -1843,28 +1843,30 @@
                         return false;
                     }
                     
-                    // Firebase設定をチェック
-                    if (this.CONSTANTS.FIREBASE_CONFIG.apiKey === "YOUR_API_KEY") {
-                        statusDiv.innerHTML = '⚠️ Firebase設定が必要です。firebaseConfigを実際の値に置き換えてください。';
-                        statusContainer.style.background = '#fff3e0';
-                        statusContainer.style.color = '#f57c00';
-                        joinBtn.disabled = true;
-                        return false;
-                    }
-                    
                     // Firebase初期化
                     if (!firebase.apps.length) {
                         firebase.initializeApp(this.CONSTANTS.FIREBASE_CONFIG);
                     }
                     this.firebase.database = firebase.database();
                     
-                    statusDiv.innerHTML = '✅ Firebase設定完了 - オンライン対戦が利用可能です！';
-                    statusContainer.style.background = '#e8f5e8';
-                    statusContainer.style.color = '#2e7d32';
-                    joinBtn.disabled = false;
+                    // テスト接続
+                    this.firebase.database.ref('.info/connected').on('value', (snapshot) => {
+                        if (snapshot.val() === true) {
+                            statusDiv.innerHTML = '✅ Firebase設定完了 - オンライン対戦が利用可能です！';
+                            statusContainer.style.background = '#e8f5e8';
+                            statusContainer.style.color = '#2e7d32';
+                            joinBtn.disabled = false;
+                        } else {
+                            statusDiv.innerHTML = '⚠️ Firebaseに接続中...';
+                            statusContainer.style.background = '#fff3e0';
+                            statusContainer.style.color = '#f57c00';
+                        }
+                    });
+                    
                     return true;
                     
                 } catch (error) {
+                    console.error('Firebase初期化エラー:', error);
                     statusDiv.innerHTML = '❌ Firebase設定エラー: ' + error.message;
                     statusContainer.style.background = '#ffebee';
                     statusContainer.style.color = '#c62828';

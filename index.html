@@ -249,6 +249,11 @@
             font-weight: bold;
             text-align: center;
             line-height: 1;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
         
         .piece.sente {
@@ -257,11 +262,24 @@
         
         .piece.gote {
             color: #8b0000;
-            transform: rotate(180deg);
         }
         
         .piece.promoted {
             color: #d4af37;
+        }
+        
+        /* 駒の向き制御 */
+        .piece.gote {
+            transform: rotate(180deg);
+        }
+        
+        /* 後手視点（盤面回転時）での駒の向き調整 */
+        .board.rotated .piece {
+            transform: rotate(180deg);
+        }
+        
+        .board.rotated .piece.gote {
+            transform: rotate(0deg);
         }
         
         /* 猫モード用スタイル */
@@ -274,10 +292,6 @@
 
         .piece img:hover {
             transform: scale(1.1);
-        }
-
-        .piece.gote img:hover {
-            transform: rotate(180deg) scale(1.1);
         }
 
         .captured-piece img {
@@ -1034,13 +1048,6 @@
                        this.onlineState.playerSide === 'gote';
             },
             
-            convertCoordinates(row, col) {
-                if (this.shouldRotateBoard()) {
-                    return [8 - row, 8 - col];
-                }
-                return [row, col];
-            },
-            
             initBoard() {
                 const board = document.getElementById('board');
                 const captures = document.querySelector('.captures');
@@ -1055,19 +1062,26 @@
                     captures.classList.remove('rotated');
                 }
                 
-                for (let row = 0; row < 9; row++) {
-                    for (let col = 0; col < 9; col++) {
+                // 後手視点の場合、盤面を逆順で描画
+                const shouldReverse = this.shouldRotateBoard();
+                
+                for (let displayRow = 0; displayRow < 9; displayRow++) {
+                    for (let displayCol = 0; displayCol < 9; displayCol++) {
+                        // 実際のゲーム座標を計算
+                        const gameRow = shouldReverse ? (8 - displayRow) : displayRow;
+                        const gameCol = shouldReverse ? (8 - displayCol) : displayCol;
+                        
                         const cell = document.createElement('div');
                         cell.className = 'cell';
-                        cell.dataset.row = row;
-                        cell.dataset.col = col;
+                        cell.dataset.row = displayRow;
+                        cell.dataset.col = displayCol;
                         cell.addEventListener('click', () => {
-                            this.handleCellClick(row, col);
+                            this.handleCellClick(gameRow, gameCol);
                         });
                         
-                        const piece = this.gameState.board[row][col];
+                        const piece = this.gameState.board[gameRow][gameCol];
                         if (piece) {
-                            const pieceElement = this.createPieceElement(piece, row, col);
+                            const pieceElement = this.createPieceElement(piece, gameRow, gameCol);
                             cell.appendChild(pieceElement);
                         }
                         
@@ -1079,7 +1093,11 @@
                 if (this.gameState.inCheck) {
                     const kingPos = this.findKingPosition(this.gameState.turn);
                     if (kingPos) {
-                        const kingCell = document.querySelector(`[data-row="${kingPos[0]}"][data-col="${kingPos[1]}"]`);
+                        // 表示用の座標を取得
+                        const displayRow = shouldReverse ? (8 - kingPos[0]) : kingPos[0];
+                        const displayCol = shouldReverse ? (8 - kingPos[1]) : kingPos[1];
+                        
+                        const kingCell = document.querySelector(`[data-row="${displayRow}"][data-col="${displayCol}"]`);
                         if (kingCell) {
                             kingCell.style.background = '#ff6b6b';
                             kingCell.style.animation = 'pulse 1s infinite';
@@ -1105,17 +1123,6 @@
                     pieceElement.appendChild(img);
                 } else {
                     pieceElement.textContent = piece;
-                    
-                    // 後手視点では駒の回転を調整
-                    if (this.shouldRotateBoard()) {
-                        if (owner === 'sente') {
-                            // 先手の駒は180度回転（後手視点では逆向き）
-                            pieceElement.style.transform = 'rotate(180deg)';
-                        } else {
-                            // 後手の駒は0度（後手視点では正向き）
-                            pieceElement.style.transform = 'rotate(0deg)';
-                        }
-                    }
                 }
                 
                 return pieceElement;
@@ -1135,41 +1142,15 @@
                     'image-rendering: -webkit-optimize-contrast; ' +
                     'image-rendering: pixelated;';
                 
-                // 回転の設定
-                if (this.shouldRotateBoard()) {
-                    // 後手視点の場合
-                    if (owner === 'sente') {
-                        img.style.transform = 'rotate(180deg)';
-                    } else {
-                        img.style.transform = 'rotate(0deg)';
-                    }
-                } else {
-                    // 先手視点の場合
-                    if (owner === 'gote') {
-                        img.style.transform = 'rotate(180deg)';
-                    } else {
-                        img.style.transform = 'rotate(0deg)';
-                    }
-                }
+                // 猫画像の回転処理は CSS で自動的に行われる
                 
                 // 画像読み込みエラーハンドリング
                 img.onerror = function() {
                     const parent = img.parentElement;
                     parent.innerHTML = '';
                     parent.textContent = piece;
-                    
-                    // エラー時の回転設定
-                    if (this.shouldRotateBoard()) {
-                        if (owner === 'sente') {
-                            parent.style.transform = 'rotate(180deg)';
-                        }
-                    } else {
-                        if (owner === 'gote') {
-                            parent.style.transform = 'rotate(180deg)';
-                        }
-                    }
                     console.warn('猫画像が読み込めませんでした:', catData.image);
-                }.bind(this);
+                };
                 
                 return img;
             },
@@ -1315,8 +1296,15 @@
                 this.clearSelection();
                 this.gameState.selectedCell = [row, col];
                 
-                const cell = document.querySelector(`[data-row="${row}"][data-col="${col}"]`);
-                cell.classList.add('selected');
+                // 表示上の選択を更新
+                const shouldReverse = this.shouldRotateBoard();
+                const displayRow = shouldReverse ? (8 - row) : row;
+                const displayCol = shouldReverse ? (8 - col) : col;
+                
+                const cell = document.querySelector(`[data-row="${displayRow}"][data-col="${displayCol}"]`);
+                if (cell) {
+                    cell.classList.add('selected');
+                }
                 
                 this.highlightPossibleMoves(row, col);
                 
@@ -1345,19 +1333,26 @@
                 const piece = this.gameState.board[row][col];
                 if (!piece) return;
                 
+                const shouldReverse = this.shouldRotateBoard();
+                
                 for (let r = 0; r < 9; r++) {
                     for (let c = 0; c < 9; c++) {
                         if (this.isValidMove(row, col, r, c)) {
-                            const cell = document.querySelector(`[data-row="${r}"][data-col="${c}"]`);
+                            // 表示用の座標を取得
+                            const displayRow = shouldReverse ? (8 - r) : r;
+                            const displayCol = shouldReverse ? (8 - c) : c;
                             
-                            if (this.canPromote(piece, row, r, this.gameState.turn)) {
-                                cell.classList.add('promotion-zone');
-                            }
-                            
-                            if (this.gameState.board[r][c]) {
-                                cell.classList.add('enemy-piece');
-                            } else {
-                                cell.classList.add('possible-move');
+                            const cell = document.querySelector(`[data-row="${displayRow}"][data-col="${displayCol}"]`);
+                            if (cell) {
+                                if (this.canPromote(piece, row, r, this.gameState.turn)) {
+                                    cell.classList.add('promotion-zone');
+                                }
+                                
+                                if (this.gameState.board[r][c]) {
+                                    cell.classList.add('enemy-piece');
+                                } else {
+                                    cell.classList.add('possible-move');
+                                }
                             }
                         }
                     }
@@ -1365,11 +1360,19 @@
             },
             
             highlightDropTargets() {
+                const shouldReverse = this.shouldRotateBoard();
+                
                 for (let row = 0; row < 9; row++) {
                     for (let col = 0; col < 9; col++) {
                         if (this.canDropPiece(row, col)) {
-                            const cell = document.querySelector(`[data-row="${row}"][data-col="${col}"]`);
-                            cell.classList.add('drop-target');
+                            // 表示用の座標を取得
+                            const displayRow = shouldReverse ? (8 - row) : row;
+                            const displayCol = shouldReverse ? (8 - col) : col;
+                            
+                            const cell = document.querySelector(`[data-row="${displayRow}"][data-col="${displayCol}"]`);
+                            if (cell) {
+                                cell.classList.add('drop-target');
+                            }
                         }
                     }
                 }
@@ -1916,12 +1919,23 @@
                 }
                 
                 // AIの手をハイライト
-                if (!randomMove.drop) {
-                    const fromCell = document.querySelector(`[data-row="${randomMove.fromRow}"][data-col="${randomMove.fromCol}"]`);
-                    const toCell = document.querySelector(`[data-row="${randomMove.toRow}"][data-col="${randomMove.toCol}"]`);
-                    if (fromCell) fromCell.classList.add('ai-move-from');
-                    if (toCell) toCell.classList.add('ai-move-to');
-                }
+                this.highlightAIMove(randomMove);
+            },
+            
+            highlightAIMove(move) {
+                if (move.drop) return;
+                
+                const shouldReverse = this.shouldRotateBoard();
+                
+                const fromDisplayRow = shouldReverse ? (8 - move.fromRow) : move.fromRow;
+                const fromDisplayCol = shouldReverse ? (8 - move.fromCol) : move.fromCol;
+                const toDisplayRow = shouldReverse ? (8 - move.toRow) : move.toRow;
+                const toDisplayCol = shouldReverse ? (8 - move.toCol) : move.toCol;
+                
+                const fromCell = document.querySelector(`[data-row="${fromDisplayRow}"][data-col="${fromDisplayCol}"]`);
+                const toCell = document.querySelector(`[data-row="${toDisplayRow}"][data-col="${toDisplayCol}"]`);
+                if (fromCell) fromCell.classList.add('ai-move-from');
+                if (toCell) toCell.classList.add('ai-move-to');
             },
             
             getAIHint() {
@@ -2160,9 +2174,11 @@
                     
                     console.log('プレイヤー状態変更:', { playerCount, players });
                     
-                    if (playerCount === 2 && !document.getElementById('chatSection').style.display) {
-                        document.getElementById('chatSection').style.display = 'block';
-                        this.showNotification('対戦相手が参加しました！', 'info');
+                    if (playerCount === 2) {
+                        if (document.getElementById('chatSection').style.display !== 'block') {
+                            document.getElementById('chatSection').style.display = 'block';
+                            this.showNotification('対戦相手が参加しました！', 'info');
+                        }
                     }
                     
                     if (playerCount === 1 && this.onlineState.connected) {
@@ -2173,25 +2189,12 @@
                     }
                 });
                 
-                // ゲーム状態変更監視（自分以外からの変更のみ）
+                // ゲーム状態変更監視（メインの同期）
                 this.firebase.currentRoomRef.child('gameState').on('value', (snapshot) => {
                     const newGameState = snapshot.val();
                     if (newGameState && this.onlineState.connected) {
-                        // 少し遅延させて、接続直後の混乱を避ける
-                        setTimeout(() => {
-                            this.syncGameState(newGameState);
-                        }, 50);
-                    }
-                });
-                
-                // 手の変更監視
-                this.firebase.movesRef = this.firebase.currentRoomRef.child('moves');
-                this.firebase.movesRef.on('child_added', (snapshot) => {
-                    const moveData = snapshot.val();
-                    if (moveData && moveData.playerId !== this.onlineState.playerId) {
-                        console.log('相手の手を受信:', moveData);
-                        // 相手の手を適用
-                        this.applyOpponentMove(moveData);
+                        console.log('ゲーム状態同期を開始:', newGameState);
+                        this.syncGameState(newGameState);
                     }
                 });
                 
@@ -2210,29 +2213,50 @@
             
             syncGameState(newGameState) {
                 try {
-                    console.log('ゲーム状態同期:', {
-                        beforeTurn: this.gameState.turn,
+                    console.log('ゲーム状態同期開始:', {
+                        currentMoveCount: this.gameState.moveHistory.length,
+                        newMoveCount: JSON.parse(newGameState.moveHistory).length,
+                        currentTurn: this.gameState.turn,
                         newTurn: newGameState.turn,
                         playerSide: this.onlineState.playerSide
                     });
                     
+                    const newMoveHistory = JSON.parse(newGameState.moveHistory);
+                    
+                    // 新しい手があるかチェック
+                    if (newMoveHistory.length > this.gameState.moveHistory.length) {
+                        // 新しい手があるので、最新の手をハイライト
+                        const latestMove = newMoveHistory[newMoveHistory.length - 1];
+                        if (latestMove.playerId && latestMove.playerId !== this.onlineState.playerId) {
+                            console.log('相手の新しい手:', latestMove);
+                            setTimeout(() => {
+                                this.highlightOpponentMove(latestMove);
+                            }, 100);
+                        }
+                    }
+                    
+                    // ゲーム状態を完全に同期
                     this.gameState.board = JSON.parse(newGameState.board);
                     this.gameState.turn = newGameState.turn;
                     this.gameState.capturedPieces = JSON.parse(newGameState.capturedPieces);
-                    this.gameState.moveHistory = JSON.parse(newGameState.moveHistory);
+                    this.gameState.moveHistory = newMoveHistory;
                     this.gameState.gameOver = newGameState.gameOver;
                     this.gameState.inCheck = newGameState.inCheck;
                     
                     // 駒の所有者を再計算
                     this.initPieceOwners();
+                    
+                    // 画面更新
                     this.initBoard();
                     this.updateMoveDisplay();
                     
-                    console.log('同期後の状態:', {
+                    console.log('同期完了:', {
                         turn: this.gameState.turn,
                         playerSide: this.onlineState.playerSide,
-                        isMyTurn: this.isMyTurn()
+                        isMyTurn: this.isMyTurn(),
+                        moveCount: this.gameState.moveHistory.length
                     });
+                    
                 } catch (error) {
                     console.error('ゲーム状態同期エラー:', error);
                 }
@@ -2240,6 +2264,8 @@
             
             applyOpponentMove(moveData) {
                 try {
+                    console.log('相手の手を適用中:', moveData);
+                    
                     if (moveData.drop) {
                         // 駒打ち
                         this.gameState.board[moveData.toRow][moveData.toCol] = moveData.piece;
@@ -2272,9 +2298,8 @@
                         this.gameState.pieceOwners[moveData.fromRow][moveData.fromCol] = null;
                     }
                     
-                    // 棋譜更新
+                    // 棋譜更新（手番変更はsyncGameStateで行う）
                     this.gameState.moveHistory.push(moveData);
-                    this.gameState.turn = this.gameState.turn === 'sente' ? 'gote' : 'sente';
                     
                     // 王手・詰みチェック
                     this.checkGameStatus();
@@ -2284,22 +2309,37 @@
                     this.updateMoveDisplay();
                     
                     // 相手の手をハイライト
-                    if (!moveData.drop) {
-                        const fromCell = document.querySelector(`[data-row="${moveData.fromRow}"][data-col="${moveData.fromCol}"]`);
-                        const toCell = document.querySelector(`[data-row="${moveData.toRow}"][data-col="${moveData.toCol}"]`);
-                        if (fromCell) fromCell.classList.add('online-move-from');
-                        if (toCell) toCell.classList.add('online-move-to');
-                    }
+                    this.highlightOpponentMove(moveData);
                     
                 } catch (error) {
                     console.error('相手の手適用エラー:', error);
                 }
             },
             
+            highlightOpponentMove(moveData) {
+                if (moveData.drop) return;
+                
+                const shouldReverse = this.shouldRotateBoard();
+                
+                // 移動元のハイライト
+                const fromDisplayRow = shouldReverse ? (8 - moveData.fromRow) : moveData.fromRow;
+                const fromDisplayCol = shouldReverse ? (8 - moveData.fromCol) : moveData.fromCol;
+                const fromCell = document.querySelector(`[data-row="${fromDisplayRow}"][data-col="${fromDisplayCol}"]`);
+                if (fromCell) fromCell.classList.add('online-move-from');
+                
+                // 移動先のハイライト
+                const toDisplayRow = shouldReverse ? (8 - moveData.toRow) : moveData.toRow;
+                const toDisplayCol = shouldReverse ? (8 - moveData.toCol) : moveData.toCol;
+                const toCell = document.querySelector(`[data-row="${toDisplayRow}"][data-col="${toDisplayCol}"]`);
+                if (toCell) toCell.classList.add('online-move-to');
+            },
+            
             sendMoveToOpponent(moveData) {
                 if (!this.firebase.currentRoomRef || !this.onlineState.connected) return;
                 
                 try {
+                    console.log('手を送信中:', moveData);
+                    
                     // 手データに追加情報を付与
                     const fullMoveData = {
                         ...moveData,
@@ -2319,20 +2359,31 @@
                         fullMoveData.toCol = parseInt(moveData.to.charAt(1));
                     }
                     
-                    // Firebaseに手を送信
-                    this.firebase.movesRef.push(fullMoveData);
-                    
-                    // ゲーム状態を更新
+                    // ゲーム状態を更新（手番も含めて）
                     const updatedGameState = {
                         board: JSON.stringify(this.gameState.board),
                         turn: this.gameState.turn,
                         capturedPieces: JSON.stringify(this.gameState.capturedPieces),
                         moveHistory: JSON.stringify(this.gameState.moveHistory),
                         gameOver: this.gameState.gameOver,
-                        inCheck: this.gameState.inCheck
+                        inCheck: this.gameState.inCheck,
+                        lastUpdated: firebase.database.ServerValue.TIMESTAMP,
+                        lastPlayer: this.onlineState.playerId
                     };
                     
-                    this.firebase.currentRoomRef.child('gameState').update(updatedGameState);
+                    console.log('Firebase更新データ:', {
+                        turn: updatedGameState.turn,
+                        moveCount: this.gameState.moveHistory.length,
+                        lastPlayer: this.onlineState.playerId
+                    });
+                    
+                    // ゲーム状態を一括更新
+                    this.firebase.currentRoomRef.child('gameState').update(updatedGameState).then(() => {
+                        console.log('Firebase更新完了');
+                    }).catch((error) => {
+                        console.error('Firebase更新エラー:', error);
+                        this.showNotification('手の送信に失敗しました', 'error');
+                    });
                     
                 } catch (error) {
                     console.error('手の送信エラー:', error);
@@ -2348,7 +2399,6 @@
                         
                         // リスナーを削除
                         this.firebase.currentRoomRef.off();
-                        if (this.firebase.movesRef) this.firebase.movesRef.off();
                         if (this.firebase.chatRef) this.firebase.chatRef.off();
                         
                         // 状態リセット

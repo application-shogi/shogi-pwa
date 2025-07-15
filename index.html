@@ -262,19 +262,15 @@
         
         .piece.gote {
             color: #8b0000;
+            transform: rotate(180deg);
         }
         
         .piece.promoted {
             color: #d4af37;
         }
         
-        /* 駒の向き制御 */
-        .piece.gote {
-            transform: rotate(180deg);
-        }
-        
         /* 後手視点（盤面回転時）での駒の向き調整 */
-        .board.rotated .piece {
+        .board.rotated .piece.sente {
             transform: rotate(180deg);
         }
         
@@ -2223,16 +2219,20 @@
                     
                     const newMoveHistory = JSON.parse(newGameState.moveHistory);
                     
+                    // 自分が更新した場合は同期をスキップ（無限ループ防止）
+                    if (newGameState.lastPlayer === this.onlineState.playerId) {
+                        console.log('自分の更新なのでスキップ');
+                        return;
+                    }
+                    
                     // 新しい手があるかチェック
                     if (newMoveHistory.length > this.gameState.moveHistory.length) {
                         // 新しい手があるので、最新の手をハイライト
                         const latestMove = newMoveHistory[newMoveHistory.length - 1];
-                        if (latestMove.playerId && latestMove.playerId !== this.onlineState.playerId) {
-                            console.log('相手の新しい手:', latestMove);
-                            setTimeout(() => {
-                                this.highlightOpponentMove(latestMove);
-                            }, 100);
-                        }
+                        console.log('相手の新しい手:', latestMove);
+                        setTimeout(() => {
+                            this.highlightOpponentMove(latestMove);
+                        }, 100);
                     }
                     
                     // ゲーム状態を完全に同期

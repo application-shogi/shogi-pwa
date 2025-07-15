@@ -875,18 +875,16 @@
                     '全': { image: './images/cats/promoted-silver-cat.png', name: 'ダイヤ猫' }
                 },
                 
-                // Firebase設定
-                const firebaseConfig = {
- apiKey: "AIzaSyBj58MkqswywncKrifsD5RyG68CuqkGQKQ",
-  authDomain: "my-shogi-online.firebaseapp.com",
-  databaseURL: "https://my-shogi-online-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId: "my-shogi-online",
-  storageBucket: "my-shogi-online.firebasestorage.app",
-  messagingSenderId: "233156650037",
-  appId: "1:233156650037:web:14802f4bffe4122a39bd7c",
-  measurementId: "G-YLTBF91J1T"
-};
-
+                // Firebase設定（Firebase ConsoleからコピーしたfirebaseConfigの値を貼り付けてください）
+                FIREBASE_CONFIG: {
+                    apiKey: "YOUR_API_KEY",  // Firebase Consoleからコピー
+                    authDomain: "YOUR_PROJECT_ID.firebaseapp.com",  // Firebase Consoleからコピー
+                    databaseURL: "https://YOUR_PROJECT_ID-default-rtdb.firebaseio.com/",  // Firebase Consoleからコピー
+                    projectId: "YOUR_PROJECT_ID",  // Firebase Consoleからコピー
+                    storageBucket: "YOUR_PROJECT_ID.appspot.com",  // Firebase Consoleからコピー
+                    messagingSenderId: "YOUR_SENDER_ID",  // Firebase Consoleからコピー
+                    appId: "YOUR_APP_ID"  // Firebase Consoleからコピー
+                }
             },
             
             // ============================================

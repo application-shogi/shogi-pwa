@@ -1146,7 +1146,8 @@
                 
                 // オンラインモードで自分の手番でない場合は無効
                 if (this.gameState.isOnlineMode && !this.isMyTurn()) {
-                    this.showNotification('相手の手番です', 'warning');
+                    const debugInfo = `現在: ${this.gameState.turn}, あなた: ${this.onlineState.playerSide}`;
+                    this.showNotification(`相手の手番です (${debugInfo})`, 'warning');
                     return;
                 }
                 
@@ -1878,6 +1879,14 @@
             
             isMyTurn() {
                 if (!this.gameState.isOnlineMode || !this.onlineState.connected) return true;
+                
+                // デバッグ用ログ
+                console.log('手番チェック:', {
+                    currentTurn: this.gameState.turn,
+                    playerSide: this.onlineState.playerSide,
+                    isMyTurn: this.gameState.turn === this.onlineState.playerSide
+                });
+                
                 return this.gameState.turn === this.onlineState.playerSide;
             },
             
@@ -1988,12 +1997,22 @@
                     this.onlineState.isHost = false;
                     this.onlineState.playerSide = mySide;
                     
-                    // ゲーム状態を同期
+                    console.log('プレイヤー設定:', {
+                        playerId: this.onlineState.playerId,
+                        playerSide: this.onlineState.playerSide,
+                        isHost: this.onlineState.isHost
+                    });
+                    
+                    // リスナーを先に設定
+                    this.setupRoomListeners();
+                    
+                    // ゲーム状態を同期（プレイヤー設定後）
                     if (roomData.gameState) {
-                        this.syncGameState(roomData.gameState);
+                        setTimeout(() => {
+                            this.syncGameState(roomData.gameState);
+                        }, 100);
                     }
                     
-                    this.setupRoomListeners();
                     this.updateConnectionStatus('connected');
                     
                     document.getElementById('joinRoomBtn').style.display = 'none';
@@ -2017,6 +2036,8 @@
                     const players = snapshot.val() || {};
                     const playerCount = Object.keys(players).length;
                     
+                    console.log('プレイヤー状態変更:', { playerCount, players });
+                    
                     if (playerCount === 2 && !document.getElementById('chatSection').style.display) {
                         document.getElementById('chatSection').style.display = 'block';
                         this.showNotification('対戦相手が参加しました！', 'info');
@@ -2030,11 +2051,14 @@
                     }
                 });
                 
-                // ゲーム状態変更監視
+                // ゲーム状態変更監視（自分以外からの変更のみ）
                 this.firebase.currentRoomRef.child('gameState').on('value', (snapshot) => {
                     const newGameState = snapshot.val();
                     if (newGameState && this.onlineState.connected) {
-                        this.syncGameState(newGameState);
+                        // 少し遅延させて、接続直後の混乱を避ける
+                        setTimeout(() => {
+                            this.syncGameState(newGameState);
+                        }, 50);
                     }
                 });
                 
@@ -2043,6 +2067,7 @@
                 this.firebase.movesRef.on('child_added', (snapshot) => {
                     const moveData = snapshot.val();
                     if (moveData && moveData.playerId !== this.onlineState.playerId) {
+                        console.log('相手の手を受信:', moveData);
                         // 相手の手を適用
                         this.applyOpponentMove(moveData);
                     }
@@ -2063,6 +2088,12 @@
             
             syncGameState(newGameState) {
                 try {
+                    console.log('ゲーム状態同期:', {
+                        beforeTurn: this.gameState.turn,
+                        newTurn: newGameState.turn,
+                        playerSide: this.onlineState.playerSide
+                    });
+                    
                     this.gameState.board = JSON.parse(newGameState.board);
                     this.gameState.turn = newGameState.turn;
                     this.gameState.capturedPieces = JSON.parse(newGameState.capturedPieces);
@@ -2074,6 +2105,12 @@
                     this.initPieceOwners();
                     this.initBoard();
                     this.updateMoveDisplay();
+                    
+                    console.log('同期後の状態:', {
+                        turn: this.gameState.turn,
+                        playerSide: this.onlineState.playerSide,
+                        isMyTurn: this.isMyTurn()
+                    });
                 } catch (error) {
                     console.error('ゲーム状態同期エラー:', error);
                 }
@@ -2280,6 +2317,18 @@
                     turnIndicator.textContent = `${currentPlayer}の番`;
                 }
                 
+                // オンラインモードでの手番制限表示
+                if (this.gameState.isOnlineMode && this.onlineState.connected) {
+                    const isMyTurn = this.isMyTurn();
+                    const playerSideText = this.onlineState.playerSide === 'sente' ? '先手' : '後手';
+                    
+                    if (isMyTurn) {
+                        turnIndicator.innerHTML += ` <small style="color: #27ae60;">(あなたの手番 - ${playerSideText})</small>`;
+                    } else {
+                        turnIndicator.innerHTML += ` <small style="color: #e74c3c;">(相手の手番 - あなたは${playerSideText})</small>`;
+                    }
+                }
+                
                 document.getElementById('moveCount').textContent = this.gameState.moveHistory.length;
                 
                 this.updateCapturedPieces();
@@ -2292,11 +2341,6 @@
                     modeIndicator.textContent = 'CPU対戦モード';
                 } else {
                     modeIndicator.textContent = 'ローカル対戦モード';
-                }
-                
-                // オンラインモードでの手番制限表示
-                if (this.gameState.isOnlineMode && this.onlineState.connected && !this.isMyTurn()) {
-                    turnIndicator.innerHTML += ' <small>(相手の手番)</small>';
                 }
             },
             

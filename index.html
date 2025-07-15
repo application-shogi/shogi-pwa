@@ -183,6 +183,11 @@
             background: #654321;
             border: 3px solid #8a5536;
             box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            transition: transform 0.5s ease;
+        }
+        
+        .board.rotated {
+            transform: rotate(180deg);
         }
         
         .cell {
@@ -307,6 +312,11 @@
             width: 100%;
             max-width: 600px;
             margin: 20px 0;
+            transition: flex-direction 0.5s ease;
+        }
+        
+        .captures.rotated {
+            flex-direction: row-reverse;
         }
         
         .capture-area {
@@ -673,11 +683,11 @@
         <!-- 駒台 -->
         <div class="captures">
             <div class="capture-area">
-                <h3>🔴 後手の駒台</h3>
+                <h3 id="goteCaptureName">🔴 後手の駒台</h3>
                 <div class="captured-pieces" id="goteCaptured"></div>
             </div>
             <div class="capture-area">
-                <h3>⚫ 先手の駒台</h3>
+                <h3 id="senteCaptureName">⚫ 先手の駒台</h3>
                 <div class="captured-pieces" id="senteCaptured"></div>
             </div>
         </div>
@@ -963,14 +973,34 @@
                 const goteDiv = document.getElementById('goteCaptured');
                 
                 senteDiv.addEventListener('click', (e) => {
-                    if (e.target.classList.contains('captured-piece') && this.gameState.turn === 'sente') {
-                        this.handleCapturedPieceClick(e.target, 'sente');
+                    if (e.target.classList.contains('captured-piece')) {
+                        if (this.gameState.isOnlineMode && this.onlineState.connected) {
+                            // オンラインモードでは自分の駒台のみ操作可能
+                            if (this.onlineState.playerSide === 'sente' && this.isMyTurn()) {
+                                this.handleCapturedPieceClick(e.target, 'sente');
+                            }
+                        } else {
+                            // ローカルモードでは現在のターンの駒台を操作可能
+                            if (this.gameState.turn === 'sente') {
+                                this.handleCapturedPieceClick(e.target, 'sente');
+                            }
+                        }
                     }
                 });
                 
                 goteDiv.addEventListener('click', (e) => {
-                    if (e.target.classList.contains('captured-piece') && this.gameState.turn === 'gote') {
-                        this.handleCapturedPieceClick(e.target, 'gote');
+                    if (e.target.classList.contains('captured-piece')) {
+                        if (this.gameState.isOnlineMode && this.onlineState.connected) {
+                            // オンラインモードでは自分の駒台のみ操作可能
+                            if (this.onlineState.playerSide === 'gote' && this.isMyTurn()) {
+                                this.handleCapturedPieceClick(e.target, 'gote');
+                            }
+                        } else {
+                            // ローカルモードでは現在のターンの駒台を操作可能
+                            if (this.gameState.turn === 'gote') {
+                                this.handleCapturedPieceClick(e.target, 'gote');
+                            }
+                        }
                     }
                 });
                 
@@ -998,9 +1028,32 @@
             // ============================================
             // 盤面表示関数
             // ============================================
+            shouldRotateBoard() {
+                return this.gameState.isOnlineMode && 
+                       this.onlineState.connected && 
+                       this.onlineState.playerSide === 'gote';
+            },
+            
+            convertCoordinates(row, col) {
+                if (this.shouldRotateBoard()) {
+                    return [8 - row, 8 - col];
+                }
+                return [row, col];
+            },
+            
             initBoard() {
                 const board = document.getElementById('board');
+                const captures = document.querySelector('.captures');
                 board.innerHTML = '';
+                
+                // 後手の場合は盤面を回転
+                if (this.shouldRotateBoard()) {
+                    board.classList.add('rotated');
+                    captures.classList.add('rotated');
+                } else {
+                    board.classList.remove('rotated');
+                    captures.classList.remove('rotated');
+                }
                 
                 for (let row = 0; row < 9; row++) {
                     for (let col = 0; col < 9; col++) {
@@ -1052,6 +1105,17 @@
                     pieceElement.appendChild(img);
                 } else {
                     pieceElement.textContent = piece;
+                    
+                    // 後手視点では駒の回転を調整
+                    if (this.shouldRotateBoard()) {
+                        if (owner === 'sente') {
+                            // 先手の駒は180度回転（後手視点では逆向き）
+                            pieceElement.style.transform = 'rotate(180deg)';
+                        } else {
+                            // 後手の駒は0度（後手視点では正向き）
+                            pieceElement.style.transform = 'rotate(0deg)';
+                        }
+                    }
                 }
                 
                 return pieceElement;
@@ -1071,9 +1135,21 @@
                     'image-rendering: -webkit-optimize-contrast; ' +
                     'image-rendering: pixelated;';
                 
-                // 後手の駒は180度回転
-                if (owner === 'gote') {
-                    img.style.transform = 'rotate(180deg)';
+                // 回転の設定
+                if (this.shouldRotateBoard()) {
+                    // 後手視点の場合
+                    if (owner === 'sente') {
+                        img.style.transform = 'rotate(180deg)';
+                    } else {
+                        img.style.transform = 'rotate(0deg)';
+                    }
+                } else {
+                    // 先手視点の場合
+                    if (owner === 'gote') {
+                        img.style.transform = 'rotate(180deg)';
+                    } else {
+                        img.style.transform = 'rotate(0deg)';
+                    }
                 }
                 
                 // 画像読み込みエラーハンドリング
@@ -1081,11 +1157,19 @@
                     const parent = img.parentElement;
                     parent.innerHTML = '';
                     parent.textContent = piece;
-                    if (owner === 'gote') {
-                        parent.style.transform = 'rotate(180deg)';
+                    
+                    // エラー時の回転設定
+                    if (this.shouldRotateBoard()) {
+                        if (owner === 'sente') {
+                            parent.style.transform = 'rotate(180deg)';
+                        }
+                    } else {
+                        if (owner === 'gote') {
+                            parent.style.transform = 'rotate(180deg)';
+                        }
                     }
                     console.warn('猫画像が読み込めませんでした:', catData.image);
-                };
+                }.bind(this);
                 
                 return img;
             },
@@ -1093,9 +1177,20 @@
             updateCapturedPieces() {
                 const senteDiv = document.getElementById('senteCaptured');
                 const goteDiv = document.getElementById('goteCaptured');
+                const senteNameDiv = document.getElementById('senteCaptureName');
+                const goteNameDiv = document.getElementById('goteCaptureName');
                 
                 senteDiv.innerHTML = '';
                 goteDiv.innerHTML = '';
+                
+                // 後手視点での駒台の名前更新
+                if (this.shouldRotateBoard()) {
+                    senteNameDiv.textContent = '⚫ 先手の駒台（相手）';
+                    goteNameDiv.textContent = '🔴 後手の駒台（あなた）';
+                } else {
+                    senteNameDiv.textContent = '⚫ 先手の駒台';
+                    goteNameDiv.textContent = '🔴 後手の駒台';
+                }
                 
                 // 先手の持ち駒
                 this.gameState.capturedPieces.sente.forEach((piece) => {
@@ -1189,6 +1284,20 @@
             },
             
             handleCapturedPieceClick(element, owner) {
+                // オンラインモードでの手番チェック
+                if (this.gameState.isOnlineMode && !this.isMyTurn()) {
+                    this.showNotification('相手の手番です', 'warning');
+                    return;
+                }
+                
+                // オンラインモードでは自分の駒台のみ操作可能
+                if (this.gameState.isOnlineMode && this.onlineState.connected) {
+                    if (owner !== this.onlineState.playerSide) {
+                        this.showNotification('相手の駒台は操作できません', 'warning');
+                        return;
+                    }
+                }
+                
                 this.clearSelection();
                 
                 element.classList.add('selected');
@@ -1891,7 +2000,13 @@
             },
             
             isPieceOwnedByCurrentPlayer(row, col) {
-                return this.gameState.pieceOwners[row][col] === this.gameState.turn;
+                if (this.gameState.isOnlineMode && this.onlineState.connected) {
+                    // オンラインモードでは自分の側の駒のみ操作可能
+                    return this.gameState.pieceOwners[row][col] === this.onlineState.playerSide;
+                } else {
+                    // ローカルモードでは現在のターンの駒を操作可能
+                    return this.gameState.pieceOwners[row][col] === this.gameState.turn;
+                }
             },
             
             joinRoom() {
@@ -1960,10 +2075,13 @@
                     this.setupRoomListeners();
                     this.updateConnectionStatus('connected');
                     
+                    // 先手として盤面を更新
+                    this.initBoard();
+                    
                     document.getElementById('joinRoomBtn').style.display = 'none';
                     document.getElementById('leaveRoomBtn').style.display = 'inline-block';
                     
-                    this.showNotification('ルームを作成しました。相手の参加を待っています...', 'info');
+                    this.showNotification('ルームを作成しました。あなたは先手です。相手の参加を待っています...', 'info');
                     
                 }).catch((error) => {
                     console.error('ルーム作成エラー:', error);
@@ -2006,6 +2124,9 @@
                     // リスナーを先に設定
                     this.setupRoomListeners();
                     
+                    // 盤面を更新（後手の場合は回転）
+                    this.initBoard();
+                    
                     // ゲーム状態を同期（プレイヤー設定後）
                     if (roomData.gameState) {
                         setTimeout(() => {
@@ -2019,7 +2140,8 @@
                     document.getElementById('leaveRoomBtn').style.display = 'inline-block';
                     document.getElementById('chatSection').style.display = 'block';
                     
-                    this.showNotification('対戦相手と接続しました！', 'info');
+                    const sideText = mySide === 'sente' ? '先手' : '後手';
+                    this.showNotification(`対戦相手と接続しました！あなたは${sideText}です。`, 'info');
                     
                 }).catch((error) => {
                     console.error('ルーム参加エラー:', error);
@@ -2241,6 +2363,13 @@
                         this.updateConnectionStatus('disconnected');
                         this.showNotification('対戦から退出しました');
                         
+                        // 盤面表示をリセット（回転を解除）
+                        const board = document.getElementById('board');
+                        const captures = document.querySelector('.captures');
+                        board.classList.remove('rotated');
+                        captures.classList.remove('rotated');
+                        this.initBoard();
+                        
                         document.getElementById('leaveRoomBtn').style.display = 'none';
                         document.getElementById('joinRoomBtn').style.display = 'inline-block';
                         document.getElementById('chatSection').style.display = 'none';
@@ -2326,6 +2455,11 @@
                         turnIndicator.innerHTML += ` <small style="color: #27ae60;">(あなたの手番 - ${playerSideText})</small>`;
                     } else {
                         turnIndicator.innerHTML += ` <small style="color: #e74c3c;">(相手の手番 - あなたは${playerSideText})</small>`;
+                    }
+                    
+                    // 後手の場合は盤面回転の説明を追加
+                    if (this.onlineState.playerSide === 'gote') {
+                        turnIndicator.innerHTML += ` <small style="color: #9b59b6;">[盤面回転中]</small>`;
                     }
                 }
                 
@@ -2461,6 +2595,12 @@
                 } else {
                     // オンライン対戦セクションを非表示
                     document.getElementById('onlineSection').style.display = 'none';
+                    
+                    // 盤面表示をリセット（回転を解除）
+                    const board = document.getElementById('board');
+                    const captures = document.querySelector('.captures');
+                    board.classList.remove('rotated');
+                    captures.classList.remove('rotated');
                     
                     if (this.gameState.isAIMode) {
                         this.showNotification('CPU対戦モードで開始しました', 'info');

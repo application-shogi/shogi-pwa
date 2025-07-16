@@ -960,7 +960,9 @@
                 isHost: false,
                 playerId: Math.random().toString(36).substr(2, 9),
                 opponentId: null,
-                playerSide: null
+                playerSide: null,
+                syncInProgress: false,  // 同期中フラグを追加
+                lastSyncVersion: 0      // 同期バージョン管理を追加
             },
             
             // Firebase変数
@@ -1065,18 +1067,9 @@
             // 盤面表示関数
             // ============================================
             shouldRotateBoard() {
-                const result = this.gameState.isOnlineMode && 
-                            this.onlineState.connected && 
-                            this.onlineState.playerSide === 'gote';
-                
-                console.log('盤面回転判定:', {
-                    isOnlineMode: this.gameState.isOnlineMode,
-                    connected: this.onlineState.connected,
-                    playerSide: this.onlineState.playerSide,
-                    result: result
-                });
-                
-                return result;
+                return this.gameState.isOnlineMode && 
+                       this.onlineState.connected && 
+                       this.onlineState.playerSide === 'gote';
             },
             
             initBoard() {
@@ -1086,21 +1079,13 @@
                 
                 // 後手の場合は盤面を回転
                 const shouldReverse = this.shouldRotateBoard();
-                console.log('盤面初期化:', {
-                    isOnlineMode: this.gameState.isOnlineMode,
-                    connected: this.onlineState.connected,
-                    playerSide: this.onlineState.playerSide,
-                    shouldReverse: shouldReverse
-                });
                 
                 if (shouldReverse) {
                     board.classList.add('rotated');
                     captures.classList.add('rotated');
-                    console.log('後手視点: 盤面を回転');
                 } else {
                     board.classList.remove('rotated');
                     captures.classList.remove('rotated');
-                    console.log('先手視点: 盤面は通常表示');
                 }
                 
                 // 後手視点の場合、盤面を逆順で描画
@@ -1259,8 +1244,6 @@
                 
                 // オンラインモードで自分の手番でない場合は無効
                 if (this.gameState.isOnlineMode && !this.isMyTurn()) {
-                    const debugInfo = `現在: ${this.gameState.turn}, あなた: ${this.onlineState.playerSide}`;
-                    this.showNotification(`相手の手番です (${debugInfo})`, 'warning');
                     return;
                 }
                 
@@ -1304,14 +1287,12 @@
             handleCapturedPieceClick(element, owner) {
                 // オンラインモードでの手番チェック
                 if (this.gameState.isOnlineMode && !this.isMyTurn()) {
-                    this.showNotification('相手の手番です', 'warning');
                     return;
                 }
                 
                 // オンラインモードでは自分の駒台のみ操作可能
                 if (this.gameState.isOnlineMode && this.onlineState.connected) {
                     if (owner !== this.onlineState.playerSide) {
-                        this.showNotification('相手の駒台は操作できません', 'warning');
                         return;
                     }
                 }
@@ -1587,18 +1568,23 @@
             },
             
             executeMoveInternal(fromRow, fromCol, toRow, toCol, piece, capturedPiece, promote) {
+                // 捕獲した駒の処理
                 if (capturedPiece) {
                     const originalPiece = this.CONSTANTS.ORIGINAL_PIECES[capturedPiece] || capturedPiece;
                     this.gameState.capturedPieces[this.gameState.turn].push(originalPiece);
                 }
                 
+                // 駒の移動
                 const finalPiece = promote ? this.CONSTANTS.PROMOTED_PIECES[piece] : piece;
                 this.gameState.board[toRow][toCol] = finalPiece;
                 this.gameState.board[fromRow][fromCol] = '';
                 
-                this.gameState.pieceOwners[toRow][toCol] = this.gameState.pieceOwners[fromRow][fromCol];
+                // 駒の所有者情報を更新（修正箇所）
+                const currentOwner = this.gameState.pieceOwners[fromRow][fromCol];
+                this.gameState.pieceOwners[toRow][toCol] = currentOwner;
                 this.gameState.pieceOwners[fromRow][fromCol] = null;
                 
+                // 移動履歴の記録
                 const moveData = {
                     from: `${fromRow}${fromCol}`,
                     to: `${toRow}${toCol}`,
@@ -1609,21 +1595,18 @@
                 
                 this.gameState.moveHistory.push(moveData);
                 
-                // ★重要: 手番を切り替える前に現在の手番を保存
-                const currentTurn = this.gameState.turn;
-                
                 // 手番を切り替え
                 this.gameState.turn = this.gameState.turn === 'sente' ? 'gote' : 'sente';
                 
                 // オンラインモードの場合、相手に送信
                 if (this.gameState.isOnlineMode && this.onlineState.connected) {
-                    // ★修正: 切り替え後の手番を送信するようにsendMoveToOpponentを呼び出す
-                    this.sendMoveToOpponent(moveData, currentTurn);
+                    this.sendMoveToOpponent(moveData);
                 }
                 
                 // 王手・詰みチェック
                 this.checkGameStatus();
                 
+                // 盤面を再描画
                 this.initBoard();
                 this.updateMoveDisplay();
                 
@@ -1636,11 +1619,14 @@
             dropPiece(row, col) {
                 const selected = this.gameState.selectedCapturedPiece;
                 
+                // 駒を配置
                 this.gameState.board[row][col] = selected.piece;
                 this.gameState.pieceOwners[row][col] = selected.owner;
                 
+                // 駒台から削除
                 this.gameState.capturedPieces[selected.owner].splice(selected.index, 1);
                 
+                // 移動履歴の記録
                 const moveData = {
                     drop: true,
                     to: `${row}${col}`,
@@ -1649,22 +1635,19 @@
                 
                 this.gameState.moveHistory.push(moveData);
                 
-                // ★重要: 手番を切り替える前に現在の手番を保存
-                const currentTurn = this.gameState.turn;
-                
                 // 手番を切り替え
                 this.gameState.turn = this.gameState.turn === 'sente' ? 'gote' : 'sente';
                 this.gameState.selectedCapturedPiece = null;
                 
                 // オンラインモードの場合、相手に送信
                 if (this.gameState.isOnlineMode && this.onlineState.connected) {
-                    // ★修正: 切り替え後の手番を送信するようにsendMoveToOpponentを呼び出す
-                    this.sendMoveToOpponent(moveData, currentTurn);
+                    this.sendMoveToOpponent(moveData);
                 }
                 
                 // 王手・詰みチェック
                 this.checkGameStatus();
                 
+                // 盤面を再描画
                 this.initBoard();
                 this.updateMoveDisplay();
                 
@@ -1998,7 +1981,7 @@
             },
             
             // ============================================
-            // オンライン機能
+            // オンライン機能（修正版）
             // ============================================
             checkFirebaseConfig() {
                 const statusDiv = document.getElementById('firebaseCheck');
@@ -2050,16 +2033,7 @@
             isMyTurn() {
                 if (!this.gameState.isOnlineMode || !this.onlineState.connected) return true;
                 
-                const result = this.gameState.turn === this.onlineState.playerSide;
-                
-                // デバッグ用ログ
-                console.log('手番チェック:', {
-                    currentTurn: this.gameState.turn,
-                    playerSide: this.onlineState.playerSide,
-                    isMyTurn: result
-                });
-                
-                return result;
+                return this.gameState.turn === this.onlineState.playerSide;
             },
             
             isPieceOwnedByCurrentPlayer(row, col) {
@@ -2120,7 +2094,9 @@
                         capturedPieces: JSON.stringify(this.gameState.capturedPieces),
                         moveHistory: JSON.stringify(this.gameState.moveHistory),
                         gameOver: this.gameState.gameOver,
-                        inCheck: this.gameState.inCheck
+                        inCheck: this.gameState.inCheck,
+                        pieceOwners: JSON.stringify(this.gameState.pieceOwners),
+                        version: 1  // バージョン管理を追加
                     },
                     createdAt: firebase.database.ServerValue.TIMESTAMP
                 };
@@ -2134,6 +2110,7 @@
                     this.onlineState.connected = true;
                     this.onlineState.isHost = true;
                     this.onlineState.playerSide = 'sente';
+                    this.onlineState.lastSyncVersion = 1;
                     
                     this.setupRoomListeners();
                     this.updateConnectionStatus('connected');
@@ -2177,13 +2154,7 @@
                     this.onlineState.connected = true;
                     this.onlineState.isHost = false;
                     this.onlineState.playerSide = mySide;
-                    
-                    console.log('プレイヤー設定:', {
-                        playerId: this.onlineState.playerId,
-                        playerSide: this.onlineState.playerSide,
-                        isHost: this.onlineState.isHost,
-                        shouldRotateBoard: this.shouldRotateBoard()
-                    });
+                    this.onlineState.lastSyncVersion = roomData.gameState.version || 0;
                     
                     // リスナーを先に設定
                     this.setupRoomListeners();
@@ -2220,8 +2191,6 @@
                     const players = snapshot.val() || {};
                     const playerCount = Object.keys(players).length;
                     
-                    console.log('プレイヤー状態変更:', { playerCount, players });
-                    
                     if (playerCount === 2) {
                         if (document.getElementById('chatSection').style.display !== 'block') {
                             document.getElementById('chatSection').style.display = 'block';
@@ -2240,9 +2209,12 @@
                 // ゲーム状態変更監視（メインの同期）
                 this.firebase.currentRoomRef.child('gameState').on('value', (snapshot) => {
                     const newGameState = snapshot.val();
-                    if (newGameState && this.onlineState.connected) {
-                        console.log('ゲーム状態同期を開始:', newGameState);
-                        this.syncGameState(newGameState);
+                    if (newGameState && this.onlineState.connected && !this.onlineState.syncInProgress) {
+                        // バージョンチェックで重複同期を防ぐ
+                        if (newGameState.version > this.onlineState.lastSyncVersion) {
+                            this.onlineState.lastSyncVersion = newGameState.version;
+                            this.syncGameState(newGameState);
+                        }
                     }
                 });
                 
@@ -2261,23 +2233,16 @@
             
             syncGameState(newGameState) {
                 try {
-                    console.log('ゲーム状態同期開始:', {
-                        currentMoveCount: this.gameState.moveHistory.length,
-                        newMoveCount: JSON.parse(newGameState.moveHistory).length,
-                        currentTurn: this.gameState.turn,
-                        newTurn: newGameState.turn,  // Firebaseから受け取った手番
-                        lastTurn: newGameState.lastTurn,  // 最後に指した側
-                        playerSide: this.onlineState.playerSide
-                    });
+                    // 同期開始
+                    this.onlineState.syncInProgress = true;
                     
                     const newMoveHistory = JSON.parse(newGameState.moveHistory);
                     
-                    // 新しい手があるかチェック（自分以外からの手のみハイライト）
+                    // 新しい手があるかチェック
                     if (newMoveHistory.length > this.gameState.moveHistory.length && 
                         newGameState.lastPlayer !== this.onlineState.playerId) {
                         // 新しい手があるので、最新の手をハイライト
                         const latestMove = newMoveHistory[newMoveHistory.length - 1];
-                        console.log('相手の新しい手:', latestMove);
                         
                         if (!latestMove.drop && latestMove.from && latestMove.to) {
                             // ハイライト用にデータ形式を変換
@@ -2295,31 +2260,64 @@
                         }
                     }
                     
-                    // ★重要: ゲーム状態を完全に同期（手番も含めて常に同期）
+                    // ゲーム状態を完全に同期
                     this.gameState.board = JSON.parse(newGameState.board);
-                    this.gameState.turn = newGameState.turn;  // Firebaseの手番を確実に適用
+                    this.gameState.turn = newGameState.turn;
                     this.gameState.capturedPieces = JSON.parse(newGameState.capturedPieces);
                     this.gameState.moveHistory = newMoveHistory;
                     this.gameState.gameOver = newGameState.gameOver;
                     this.gameState.inCheck = newGameState.inCheck;
                     
-                    // 駒の所有者を再計算
-                    this.initPieceOwners();
+                    // 駒の所有者情報も同期（修正箇所）
+                    if (newGameState.pieceOwners) {
+                        this.gameState.pieceOwners = JSON.parse(newGameState.pieceOwners);
+                    } else {
+                        // 互換性のため、pieceOwnersがない場合は再計算
+                        this.rebuildPieceOwners();
+                    }
                     
                     // 画面更新
                     this.initBoard();
                     this.updateMoveDisplay();
                     
-                    console.log('同期完了:', {
-                        turn: this.gameState.turn,
-                        playerSide: this.onlineState.playerSide,
-                        isMyTurn: this.isMyTurn(),
-                        moveCount: this.gameState.moveHistory.length
-                    });
-                    
                 } catch (error) {
                     console.error('ゲーム状態同期エラー:', error);
+                } finally {
+                    // 同期終了
+                    setTimeout(() => {
+                        this.onlineState.syncInProgress = false;
+                    }, 100);
                 }
+            },
+            
+            // 駒の所有者情報を盤面から再構築（修正版）
+            rebuildPieceOwners() {
+                // 移動履歴から駒の所有者を追跡して再構築
+                this.initPieceOwners();  // まず初期状態に戻す
+                
+                // 移動履歴を再適用
+                this.gameState.moveHistory.forEach((move) => {
+                    if (move.drop) {
+                        // 駒を打った場合
+                        const row = parseInt(move.to.charAt(0));
+                        const col = parseInt(move.to.charAt(1));
+                        // 履歴の順番から手番を推測
+                        const moveIndex = this.gameState.moveHistory.indexOf(move);
+                        const owner = moveIndex % 2 === 0 ? 'sente' : 'gote';
+                        this.gameState.pieceOwners[row][col] = owner;
+                    } else {
+                        // 駒を動かした場合
+                        const fromRow = parseInt(move.from.charAt(0));
+                        const fromCol = parseInt(move.from.charAt(1));
+                        const toRow = parseInt(move.to.charAt(0));
+                        const toCol = parseInt(move.to.charAt(1));
+                        
+                        // 移動元の所有者情報を移動先にコピー
+                        const owner = this.gameState.pieceOwners[fromRow][fromCol];
+                        this.gameState.pieceOwners[toRow][toCol] = owner;
+                        this.gameState.pieceOwners[fromRow][fromCol] = null;
+                    }
+                });
             },
             
             highlightOpponentMove(moveData) {
@@ -2340,64 +2338,46 @@
                 if (toCell) toCell.classList.add('online-move-to');
             },
             
-            sendMoveToOpponent(moveData, playedBy = null) {
+            sendMoveToOpponent(moveData) {
                 if (!this.firebase.currentRoomRef || !this.onlineState.connected) return;
                 
                 try {
-                    console.log('手を送信中:', moveData);
+                    this.onlineState.syncInProgress = true;  // 同期フラグをセット
                     
-                    // 手データに追加情報を付与
-                    const fullMoveData = {
-                        ...moveData,
-                        playerId: this.onlineState.playerId,
-                        owner: this.onlineState.playerSide,
-                        timestamp: firebase.database.ServerValue.TIMESTAMP
-                    };
+                    // バージョンをインクリメント
+                    const newVersion = this.onlineState.lastSyncVersion + 1;
                     
-                    // 移動データの修正
-                    if (moveData.drop) {
-                        fullMoveData.toRow = parseInt(moveData.to.charAt(0));
-                        fullMoveData.toCol = parseInt(moveData.to.charAt(1));
-                    } else {
-                        fullMoveData.fromRow = parseInt(moveData.from.charAt(0));
-                        fullMoveData.fromCol = parseInt(moveData.from.charAt(1));
-                        fullMoveData.toRow = parseInt(moveData.to.charAt(0));
-                        fullMoveData.toCol = parseInt(moveData.to.charAt(1));
-                    }
-                    
-                    // ★重要: ゲーム状態を更新（現在の手番を正しく送信）
+                    // ゲーム状態を更新
                     const updatedGameState = {
                         board: JSON.stringify(this.gameState.board),
-                        turn: this.gameState.turn,  // ★これは既に切り替わった後の手番（次の手番）
+                        turn: this.gameState.turn,
                         capturedPieces: JSON.stringify(this.gameState.capturedPieces),
                         moveHistory: JSON.stringify(this.gameState.moveHistory),
                         gameOver: this.gameState.gameOver,
                         inCheck: this.gameState.inCheck,
+                        pieceOwners: JSON.stringify(this.gameState.pieceOwners),  // 所有者情報も送信
                         lastUpdated: firebase.database.ServerValue.TIMESTAMP,
                         lastPlayer: this.onlineState.playerId,
-                        lastTurn: playedBy || this.onlineState.playerSide  // ★誰が指したかを記録
+                        version: newVersion
                     };
-                    
-                    console.log('Firebase更新データ:', {
-                        turn: updatedGameState.turn,  // 次の手番
-                        lastTurn: updatedGameState.lastTurn,  // 今指した側
-                        moveCount: this.gameState.moveHistory.length,
-                        lastPlayer: this.onlineState.playerId
-                    });
                     
                     // ゲーム状態を一括更新
                     return this.firebase.currentRoomRef.child('gameState').update(updatedGameState).then(() => {
-                        console.log('Firebase更新完了');
-                        // 自分の画面も確実に更新
-                        this.updateDisplay();
+                        this.onlineState.lastSyncVersion = newVersion;
+                        // 同期フラグをリセット
+                        setTimeout(() => {
+                            this.onlineState.syncInProgress = false;
+                        }, 100);
                     }).catch((error) => {
                         console.error('Firebase更新エラー:', error);
                         this.showNotification('手の送信に失敗しました', 'error');
+                        this.onlineState.syncInProgress = false;
                     });
                     
                 } catch (error) {
                     console.error('手の送信エラー:', error);
                     this.showNotification('手の送信に失敗しました', 'error');
+                    this.onlineState.syncInProgress = false;
                 }
             },
             
@@ -2416,6 +2396,8 @@
                         this.onlineState.roomId = null;
                         this.onlineState.isHost = false;
                         this.onlineState.playerSide = null;
+                        this.onlineState.syncInProgress = false;
+                        this.onlineState.lastSyncVersion = 0;
                         this.firebase.currentRoomRef = null;
                         this.firebase.movesRef = null;
                         this.firebase.chatRef = null;
@@ -2510,12 +2492,6 @@
                 if (this.gameState.isOnlineMode && this.onlineState.connected) {
                     const isMyTurn = this.isMyTurn();
                     const playerSideText = this.onlineState.playerSide === 'sente' ? '先手' : '後手';
-                    
-                    console.log('手番表示更新:', {
-                        currentTurn: this.gameState.turn,
-                        playerSide: this.onlineState.playerSide,
-                        isMyTurn: isMyTurn
-                    });
                     
                     if (isMyTurn) {
                         turnIndicator.innerHTML += ` <small style="color: #27ae60;">(あなたの手番 - ${playerSideText})</small>`;

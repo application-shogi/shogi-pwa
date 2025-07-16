@@ -1584,13 +1584,14 @@
                 this.gameState.pieceOwners[toRow][toCol] = currentOwner;
                 this.gameState.pieceOwners[fromRow][fromCol] = null;
                 
-                // 移動履歴の記録
+                // 移動履歴の記録（修正：turn情報を含める）
                 const moveData = {
                     from: `${fromRow}${fromCol}`,
                     to: `${toRow}${toCol}`,
                     piece: piece,
                     captured: capturedPiece,
-                    promoted: promote
+                    promoted: promote,
+                    turn: this.gameState.turn  // 誰の手番かを記録
                 };
                 
                 this.gameState.moveHistory.push(moveData);
@@ -1626,11 +1627,12 @@
                 // 駒台から削除
                 this.gameState.capturedPieces[selected.owner].splice(selected.index, 1);
                 
-                // 移動履歴の記録
+                // 移動履歴の記録（修正：turn情報を含める）
                 const moveData = {
                     drop: true,
                     to: `${row}${col}`,
-                    piece: selected.piece
+                    piece: selected.piece,
+                    turn: this.gameState.turn  // 誰の手番かを記録
                 };
                 
                 this.gameState.moveHistory.push(moveData);
@@ -2292,18 +2294,19 @@
             
             // 駒の所有者情報を盤面から再構築（修正版）
             rebuildPieceOwners() {
-                // 移動履歴から駒の所有者を追跡して再構築
-                this.initPieceOwners();  // まず初期状態に戻す
+                // 初期状態に戻す
+                this.initPieceOwners();
                 
-                // 移動履歴を再適用
-                this.gameState.moveHistory.forEach((move) => {
+                // 移動履歴を順番に適用
+                for (let i = 0; i < this.gameState.moveHistory.length; i++) {
+                    const move = this.gameState.moveHistory[i];
+                    
                     if (move.drop) {
                         // 駒を打った場合
                         const row = parseInt(move.to.charAt(0));
                         const col = parseInt(move.to.charAt(1));
-                        // 履歴の順番から手番を推測
-                        const moveIndex = this.gameState.moveHistory.indexOf(move);
-                        const owner = moveIndex % 2 === 0 ? 'sente' : 'gote';
+                        // turn情報がある場合はそれを使用、ない場合は履歴から推測
+                        const owner = move.turn || (i % 2 === 0 ? 'sente' : 'gote');
                         this.gameState.pieceOwners[row][col] = owner;
                     } else {
                         // 駒を動かした場合
@@ -2312,12 +2315,11 @@
                         const toRow = parseInt(move.to.charAt(0));
                         const toCol = parseInt(move.to.charAt(1));
                         
-                        // 移動元の所有者情報を移動先にコピー
-                        const owner = this.gameState.pieceOwners[fromRow][fromCol];
-                        this.gameState.pieceOwners[toRow][toCol] = owner;
+                        // 移動先に所有者情報をコピー
+                        this.gameState.pieceOwners[toRow][toCol] = this.gameState.pieceOwners[fromRow][fromCol];
                         this.gameState.pieceOwners[fromRow][fromCol] = null;
                     }
-                });
+                }
             },
             
             highlightOpponentMove(moveData) {

@@ -187,9 +187,18 @@
         }
         
         /* 重要：回転の優先順位を上げる */
-        .board.rotated {
-            transform: rotate(180deg) !important;
-        }
+        .board-container {
+    transition: transform 0.5s ease;
+}
+
+.board-container.rotated {
+    transform: rotate(180deg);
+}
+
+/* 駒の向きを調整 */
+.board-container.rotated .piece {
+    transform: rotate(180deg);
+}
         
         /* 視点インジケーター */
         #viewIndicator {
@@ -330,14 +339,9 @@
         }
         
         /* 後手視点（盤面回転時）での駒の向き調整 - 優先順位を上げる */
-        .board.rotated .piece.sente {
-            transform: rotate(180deg) !important;
-        }
-        
-        .board.rotated .piece.gote {
-            transform: rotate(0deg) !important;
-            color: #8b0000;
-        }
+        .board-container.rotated .piece {
+    transform: rotate(180deg);
+}
         
         /* 成駒の場合も同様に調整 */
         .board.rotated .piece.sente.promoted {
@@ -1171,9 +1175,9 @@
                 // クラスの設定を確実に行う
                 if (shouldReverse) {
                     // 既存のクラスを保持しつつrotatedを追加
-                    if (!board.classList.contains('rotated')) {
-                        board.classList.add('rotated');
-                    }
+                    if (!boardContainer.classList.contains('rotated')) {
+        boardContainer.classList.add('rotated');
+    }
                     if (!captures.classList.contains('rotated')) {
                         captures.classList.add('rotated');
                     }

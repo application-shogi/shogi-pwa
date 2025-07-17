@@ -186,25 +186,32 @@
             transform-origin: center center;
         }
         
+        /* 重要：回転の優先順位を上げる */
         .board.rotated {
             transform: rotate(180deg) !important;
         }
         
-        /* デバッグ用：回転を確認しやすくする */
-        .board.rotated::after {
-            content: "後手視点";
-            position: absolute;
-            top: -30px;
-            left: 50%;
-            transform: translateX(-50%) rotate(180deg);
+        /* 視点インジケーター */
+        #viewIndicator {
             background: #9b59b6;
             color: white;
-            padding: 2px 8px;
-            border-radius: 3px;
-            font-size: 10px;
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-size: 12px;
+            margin-bottom: 10px;
+            text-align: center;
         }
         
         /* 駒台の回転 */
+        .captures {
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+            max-width: 600px;
+            margin: 20px 0;
+            transition: flex-direction 0.5s ease;
+        }
+        
         .captures.rotated {
             flex-direction: row-reverse !important;
         }
@@ -392,19 +399,6 @@
         /* ============================================
            駒台
         ============================================ */
-        .captures {
-            display: flex;
-            justify-content: space-between;
-            width: 100%;
-            max-width: 600px;
-            margin: 20px 0;
-            transition: flex-direction 0.5s ease;
-        }
-        
-        .captures.rotated {
-            flex-direction: row-reverse;
-        }
-        
         .capture-area {
             background: rgba(255,255,255,0.8);
             border: 2px solid #8a5536;
@@ -445,11 +439,6 @@
             background: #85c1e9;
             border-color: #3498db;
             box-shadow: 0 0 5px rgba(52, 152, 219, 0.5);
-        }
-        
-        /* 駒台の回転 */
-        .captures.rotated {
-            flex-direction: row-reverse !important;
         }
         
         /* ============================================
@@ -962,7 +951,7 @@
                 // 猫モードデータ
                 CAT_DATA: {
                     '王': { image: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHZpZXdCb3g9IjAgMCA0MCA0MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48dGV4dCB4PSIyMCIgeT0iMjUiIGZpbGw9IiNmZjY5YjQiIGZvbnQtc2l6ZT0iMjQiIHRleHQtYW5jaG9yPSJtaWRkbGUiPvCfkLg8L3RleHQ+PC9zdmc+', name: '王様猫' },
-                    '飛': { image: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHZpZXdCb3g9IjAgMCA0MCA0MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48dGV4dCB4PSIyMCIgeT0iMjUiIGZpbGw9IiNmZjY5YjQiIGZvbnQtc2l6ZT0iMjQiIHRleHQtYW5jaG9yPSJtaWRkbGUiPvCfkos8L3RleHQ+PC9zdmc+', name: '飛行猫' },
+                    '飛': { image: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHZpZXdCb3g9IjAgMCA0MCA0MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48dGV4dCB4PSIyMCIgeT0iMjUiIGZpbGw9IiNmZjY5YjQiIGZvbnQtc2l6ZT0iMjQiIHRleHQtYW5jaG9yPSJtaWRkbGUiPvCfkIs8L3RleHQ+PC9zdmc+', name: '飛行猫' },
                     '角': { image: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHZpZXdCb3g9IjAgMCA0MCA0MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48dGV4dCB4PSIyMCIgeT0iMjUiIGZpbGw9IiNmZjY5YjQiIGZvbnQtc2l6ZT0iMjQiIHRleHQtYW5jaG9yPSJtaWRkbGUiPvCfkIs8L3RleHQ+PC9zdmc+', name: '弓矢猫' },
                     '金': { image: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHZpZXdCb3g9IjAgMCA0MCA0MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48dGV4dCB4PSIyMCIgeT0iMjUiIGZpbGw9IiNmZmQ3MDAiIGZvbnQtc2l6ZT0iMjQiIHRleHQtYW5jaG9yPSJtaWRkbGUiPvCfkIs8L3RleHQ+PC9zdmc+', name: '金持ち猫' },
                     '銀': { image: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHZpZXdCb3g9IjAgMCA0MCA0MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48dGV4dCB4PSIyMCIgeT0iMjUiIGZpbGw9IiNjMGM0Yzg0IiBmb250LXNpemU9IjI0IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj7wn5CKPC90ZXh0Pjwvc3ZnPg==', name: '銀猫' },
@@ -1018,7 +1007,8 @@
                 opponentId: null,
                 playerSide: null,
                 syncInProgress: false,  // 同期中フラグを追加
-                lastSyncVersion: 0      // 同期バージョン管理を追加
+                lastSyncVersion: 0,     // 同期バージョン管理を追加
+                boardInitialized: false // 盤面初期化済みフラグを追加
             },
             
             // Firebase変数
@@ -1120,17 +1110,19 @@
             },
             
             // ============================================
-            // 盤面表示関数
+            // 盤面表示関数（修正版）
             // ============================================
             shouldRotateBoard() {
                 const shouldRotate = this.gameState.isOnlineMode && 
                                    this.onlineState.connected && 
+                                   this.onlineState.boardInitialized &&
                                    this.onlineState.playerSide === 'gote';
                 
                 // デバッグ情報
                 console.log('盤面回転チェック:', {
                     isOnlineMode: this.gameState.isOnlineMode,
                     connected: this.onlineState.connected,
+                    boardInitialized: this.onlineState.boardInitialized,
                     playerSide: this.onlineState.playerSide,
                     shouldRotate: shouldRotate
                 });
@@ -1147,42 +1139,37 @@
                 // 後手の場合は盤面を回転
                 const shouldReverse = this.shouldRotateBoard();
                 
+                // クラスの設定を確実に行う
                 if (shouldReverse) {
-                    board.classList.add('rotated');
-                    captures.classList.add('rotated');
-                    
-                    // デバッグ：スタイルを直接適用してみる
-                    board.style.transform = 'rotate(180deg)';
+                    // 既存のクラスを保持しつつrotatedを追加
+                    if (!board.classList.contains('rotated')) {
+                        board.classList.add('rotated');
+                    }
+                    if (!captures.classList.contains('rotated')) {
+                        captures.classList.add('rotated');
+                    }
                     
                     // 視点インジケーターを追加
                     if (!document.getElementById('viewIndicator')) {
                         const indicator = document.createElement('div');
                         indicator.id = 'viewIndicator';
-                        indicator.style.cssText = 
-                            'background: #9b59b6;' +
-                            'color: white;' +
-                            'padding: 5px 10px;' +
-                            'border-radius: 5px;' +
-                            'font-size: 12px;' +
-                            'margin-bottom: 10px;' +
-                            'text-align: center;';
                         indicator.textContent = '🔄 後手視点（盤面回転中）';
                         boardContainer.insertBefore(indicator, boardContainer.firstChild);
                     }
-                    console.log('盤面を後手視点に回転しました - classList:', board.classList.toString());
+                    
+                    console.log('盤面を後手視点に回転しました');
                 } else {
+                    // rotatedクラスを削除
                     board.classList.remove('rotated');
                     captures.classList.remove('rotated');
-                    
-                    // デバッグ：スタイルをリセット
-                    board.style.transform = '';
                     
                     // 視点インジケーターを削除
                     const indicator = document.getElementById('viewIndicator');
                     if (indicator) {
                         indicator.remove();
                     }
-                    console.log('盤面を先手視点に設定しました - classList:', board.classList.toString());
+                    
+                    console.log('盤面を先手視点に設定しました');
                 }
                 
                 // 座標表示を追加
@@ -2246,10 +2233,12 @@
                     this.onlineState.isHost = true;
                     this.onlineState.playerSide = 'sente';
                     this.onlineState.lastSyncVersion = 1;
+                    this.onlineState.boardInitialized = true; // 盤面初期化済みフラグ設定
                     
                     console.log('先手として参加:', {
                         playerSide: this.onlineState.playerSide,
-                        connected: this.onlineState.connected
+                        connected: this.onlineState.connected,
+                        boardInitialized: this.onlineState.boardInitialized
                     });
                     
                     this.setupRoomListeners();
@@ -2334,15 +2323,16 @@
                     this.onlineState.playerSide = mySide;
                     this.onlineState.lastSyncVersion = roomData.gameState.version || 0;
                     
-                    console.log('後手として参加:', {
+                    console.log('後手として参加（設定前）:', {
                         playerSide: this.onlineState.playerSide,
-                        connected: this.onlineState.connected
+                        connected: this.onlineState.connected,
+                        boardInitialized: this.onlineState.boardInitialized
                     });
                     
                     // playerSideが設定された後でリスナーを設定
                     this.setupRoomListeners();
                     
-                    // ゲーム状態を同期（リスナー設定後）- 初回はボード初期化をスキップ
+                    // ゲーム状態を同期（リスナー設定後）
                     if (roomData.gameState) {
                         // 同期処理の前に少し待つ
                         setTimeout(() => {
@@ -2350,10 +2340,14 @@
                         }, 50);
                     }
                     
-                    // 盤面を更新（後手の場合は回転）- さらに遅延を入れる
+                    // 盤面初期化済みフラグを設定してから盤面を更新
                     setTimeout(() => {
+                        this.onlineState.boardInitialized = true;
                         this.initBoard();
-                        console.log('盤面初期化完了（後手）');
+                        console.log('盤面初期化完了（後手）:', {
+                            playerSide: this.onlineState.playerSide,
+                            boardInitialized: this.onlineState.boardInitialized
+                        });
                     }, 200);
                     
                     this.updateConnectionStatus('connected');
@@ -2483,11 +2477,11 @@
                     }
                     
                     // playerSideが設定されていることを確認してから画面更新
-                    if (!skipBoardInit && this.onlineState.playerSide) {
+                    if (!skipBoardInit && this.onlineState.playerSide && this.onlineState.boardInitialized) {
                         this.initBoard();
                         this.updateMoveDisplay();
                     } else if (!skipBoardInit) {
-                        console.warn('playerSideが未設定のため、盤面更新をスキップ');
+                        console.warn('playerSideまたはboardInitializedが未設定のため、盤面更新をスキップ');
                     }
                     
                 } catch (error) {
@@ -2608,6 +2602,7 @@
                         this.onlineState.playerSide = null;
                         this.onlineState.syncInProgress = false;
                         this.onlineState.lastSyncVersion = 0;
+                        this.onlineState.boardInitialized = false; // 追加
                         this.firebase.currentRoomRef = null;
                         this.firebase.movesRef = null;
                         this.firebase.chatRef = null;
@@ -2833,7 +2828,8 @@
                     opponentId: null,
                     playerSide: null,
                     syncInProgress: false,
-                    lastSyncVersion: 0
+                    lastSyncVersion: 0,
+                    boardInitialized: false
                 };
                 
                 this.gameState = {

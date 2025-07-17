@@ -184,9 +184,41 @@
             border: 3px solid #8a5536;
             box-shadow: 0 4px 20px rgba(0,0,0,0.3);
             transition: transform 0.5s ease;
+            position: relative;
         }
         
         .board.rotated {
+            transform: rotate(180deg);
+        }
+        
+        /* 座標表示 */
+        .board-coordinates {
+            position: absolute;
+            font-size: 10px;
+            color: #8a5536;
+            font-weight: bold;
+        }
+        
+        .coord-top {
+            top: -20px;
+            left: 0;
+            right: 0;
+            display: flex;
+            justify-content: space-around;
+            padding: 0 20px;
+        }
+        
+        .coord-left {
+            left: -20px;
+            top: 0;
+            bottom: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-around;
+            padding: 20px 0;
+        }
+        
+        .board.rotated .board-coordinates span {
             transform: rotate(180deg);
         }
         
@@ -1074,6 +1106,7 @@
             
             initBoard() {
                 const board = document.getElementById('board');
+                const boardContainer = document.querySelector('.board-container');
                 const captures = document.querySelector('.captures');
                 board.innerHTML = '';
                 
@@ -1083,10 +1116,33 @@
                 if (shouldReverse) {
                     board.classList.add('rotated');
                     captures.classList.add('rotated');
+                    // 視点インジケーターを追加
+                    if (!document.getElementById('viewIndicator')) {
+                        const indicator = document.createElement('div');
+                        indicator.id = 'viewIndicator';
+                        indicator.style.cssText = 
+                            'background: #9b59b6;' +
+                            'color: white;' +
+                            'padding: 5px 10px;' +
+                            'border-radius: 5px;' +
+                            'font-size: 12px;' +
+                            'margin-bottom: 10px;' +
+                            'text-align: center;';
+                        indicator.textContent = '🔄 後手視点（盤面回転中）';
+                        boardContainer.insertBefore(indicator, boardContainer.firstChild);
+                    }
                 } else {
                     board.classList.remove('rotated');
                     captures.classList.remove('rotated');
+                    // 視点インジケーターを削除
+                    const indicator = document.getElementById('viewIndicator');
+                    if (indicator) {
+                        indicator.remove();
+                    }
                 }
+                
+                // 座標表示を追加
+                this.addBoardCoordinates(boardContainer, shouldReverse);
                 
                 // 後手視点の場合、盤面を逆順で描画
                 for (let displayRow = 0; displayRow < 9; displayRow++) {
@@ -1130,6 +1186,36 @@
                 }
                 
                 this.updateDisplay();
+            },
+            
+            addBoardCoordinates(boardContainer, isRotated) {
+                // 既存の座標を削除
+                const existingCoords = boardContainer.querySelectorAll('.board-coordinates');
+                existingCoords.forEach(coord => coord.remove());
+                
+                // 横座標（9-1 または 1-9）
+                const topCoord = document.createElement('div');
+                topCoord.className = 'board-coordinates coord-top';
+                const cols = isRotated ? ['1','2','3','4','5','6','7','8','9'] : ['9','8','7','6','5','4','3','2','1'];
+                cols.forEach(num => {
+                    const span = document.createElement('span');
+                    span.textContent = num;
+                    if (isRotated) span.style.transform = 'rotate(180deg)';
+                    topCoord.appendChild(span);
+                });
+                boardContainer.appendChild(topCoord);
+                
+                // 縦座標（一-九 または 九-一）
+                const leftCoord = document.createElement('div');
+                leftCoord.className = 'board-coordinates coord-left';
+                const rows = isRotated ? ['九','八','七','六','五','四','三','二','一'] : ['一','二','三','四','五','六','七','八','九'];
+                rows.forEach(kanji => {
+                    const span = document.createElement('span');
+                    span.textContent = kanji;
+                    if (isRotated) span.style.transform = 'rotate(180deg)';
+                    leftCoord.appendChild(span);
+                });
+                boardContainer.appendChild(leftCoord);
             },
             
             createPieceElement(piece, row, col) {
@@ -2087,28 +2173,31 @@
             },
             
             createRoom(roomId, password) {
-                const roomData = {
-                    password: password,
-                    players: {},
-                    gameState: {
-                        board: JSON.stringify(this.gameState.board),
-                        turn: this.gameState.turn,
-                        capturedPieces: JSON.stringify(this.gameState.capturedPieces),
-                        moveHistory: JSON.stringify(this.gameState.moveHistory),
-                        gameOver: this.gameState.gameOver,
-                        inCheck: this.gameState.inCheck,
-                        pieceOwners: JSON.stringify(this.gameState.pieceOwners),
-                        version: 1  // バージョン管理を追加
-                    },
-                    createdAt: firebase.database.ServerValue.TIMESTAMP
-                };
-                
-                roomData.players[this.onlineState.playerId] = {
-                    side: 'sente',
-                    joinedAt: firebase.database.ServerValue.TIMESTAMP
-                };
-                
-                this.firebase.currentRoomRef.set(roomData).then(() => {
+                // 既存のルームデータをクリア（古いセッションの削除）
+                this.firebase.currentRoomRef.remove().then(() => {
+                    const roomData = {
+                        password: password,
+                        players: {},
+                        gameState: {
+                            board: JSON.stringify(this.gameState.board),
+                            turn: this.gameState.turn,
+                            capturedPieces: JSON.stringify(this.gameState.capturedPieces),
+                            moveHistory: JSON.stringify(this.gameState.moveHistory),
+                            gameOver: this.gameState.gameOver,
+                            inCheck: this.gameState.inCheck,
+                            pieceOwners: JSON.stringify(this.gameState.pieceOwners),
+                            version: 1  // バージョン管理を追加
+                        },
+                        createdAt: firebase.database.ServerValue.TIMESTAMP
+                    };
+                    
+                    roomData.players[this.onlineState.playerId] = {
+                        side: 'sente',
+                        joinedAt: firebase.database.ServerValue.TIMESTAMP
+                    };
+                    
+                    return this.firebase.currentRoomRef.set(roomData);
+                }).then(() => {
                     this.onlineState.connected = true;
                     this.onlineState.isHost = true;
                     this.onlineState.playerSide = 'sente';
@@ -2134,17 +2223,34 @@
             
             joinExistingRoom(roomId, roomData) {
                 const players = roomData.players || {};
-                const playerCount = Object.keys(players).length;
                 
-                if (playerCount >= 2) {
+                // アクティブなプレイヤーのみをカウント（古いセッションのクリーンアップ）
+                const activePlayers = {};
+                const currentTime = Date.now();
+                
+                for (const [playerId, playerData] of Object.entries(players)) {
+                    // 5分以内に参加したプレイヤーのみアクティブとみなす
+                    if (playerData.joinedAt && (currentTime - playerData.joinedAt < 300000)) {
+                        activePlayers[playerId] = playerData;
+                    }
+                }
+                
+                const activePlayerCount = Object.keys(activePlayers).length;
+                
+                // 古いプレイヤーデータをクリーンアップ
+                if (Object.keys(players).length !== activePlayerCount) {
+                    this.firebase.currentRoomRef.child('players').set(activePlayers);
+                }
+                
+                if (activePlayerCount >= 2) {
                     this.showNotification('このルームは満室です', 'warning');
                     this.updateConnectionStatus('disconnected');
                     return;
                 }
                 
                 // 既存プレイヤーの手番を確認
-                const existingPlayer = Object.values(players)[0];
-                const mySide = existingPlayer.side === 'sente' ? 'gote' : 'sente';
+                const existingPlayer = Object.values(activePlayers)[0];
+                const mySide = existingPlayer ? (existingPlayer.side === 'sente' ? 'gote' : 'sente') : 'sente';
                 
                 const playerUpdate = {};
                 playerUpdate['players/' + this.onlineState.playerId] = {

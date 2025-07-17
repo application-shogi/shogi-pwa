@@ -8,8 +8,6 @@
     <!-- PWA設定 -->
     <link rel="manifest" href="./manifest.json">
     <link rel="apple-touch-icon" href="./icons/icon-192x192.png">
-    <link rel="icon" type="image/png" sizes="32x32" href="./icons/icon-32x32.png">
-    <link rel="icon" type="image/png" sizes="16x16" href="./icons/icon-16x16.png">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -773,6 +771,7 @@
             <button class="button" onclick="gameController.toggleBeginnerMode()" id="beginnerToggle">🎓 初心者モード</button>
             <button class="button cat-mode-button" onclick="gameController.toggleCatMode()" title="可愛い猫の駒に変更します">🐱 猫モード</button>
             <button class="button" onclick="gameController.getAIHint()" id="hintBtn">💡 ヒント</button>
+            <button class="button" onclick="gameController.toggleView()" id="viewToggle" style="display: none;">🔄 視点切替</button>
             <button class="button" onclick="gameController.saveGame()">💾 保存</button>
         </div>
         
@@ -1141,6 +1140,7 @@
                         indicator.textContent = '🔄 後手視点（盤面回転中）';
                         boardContainer.insertBefore(indicator, boardContainer.firstChild);
                     }
+                    console.log('盤面を後手視点に回転しました');
                 } else {
                     board.classList.remove('rotated');
                     captures.classList.remove('rotated');
@@ -1149,6 +1149,7 @@
                     if (indicator) {
                         indicator.remove();
                     }
+                    console.log('盤面を先手視点に設定しました');
                 }
                 
                 // 座標表示を追加
@@ -2213,11 +2214,19 @@
                     this.onlineState.playerSide = 'sente';
                     this.onlineState.lastSyncVersion = 1;
                     
+                    console.log('先手として参加:', {
+                        playerSide: this.onlineState.playerSide,
+                        connected: this.onlineState.connected
+                    });
+                    
                     this.setupRoomListeners();
                     this.updateConnectionStatus('connected');
                     
-                    // 先手として盤面を更新
-                    this.initBoard();
+                    // 先手として盤面を更新（回転なし）
+                    setTimeout(() => {
+                        this.initBoard();
+                        console.log('盤面初期化完了（先手）');
+                    }, 100);
                     
                     document.getElementById('joinRoomBtn').style.display = 'none';
                     document.getElementById('leaveRoomBtn').style.display = 'inline-block';
@@ -2232,6 +2241,8 @@
             },
             
             joinExistingRoom(roomId, roomData) {
+                console.log('既存ルーム参加開始:', roomData);
+                
                 const players = roomData.players || {};
                 
                 // アクティブなプレイヤーのみをカウント（古いセッションのクリーンアップ）
@@ -2239,9 +2250,13 @@
                 const currentTime = Date.now();
                 
                 for (const [playerId, playerData] of Object.entries(players)) {
-                    // 5分以内に参加したプレイヤーのみアクティブとみなす
-                    if (playerData.joinedAt && (currentTime - playerData.joinedAt < 300000)) {
-                        activePlayers[playerId] = playerData;
+                    // プレイヤーデータが有効かチェック
+                    if (playerData && typeof playerData === 'object') {
+                        // 5分以内に参加したプレイヤーのみアクティブとみなす
+                        // joinedAtがない場合は古いデータとして扱う
+                        if (!playerData.joinedAt || (currentTime - playerData.joinedAt < 300000)) {
+                            activePlayers[playerId] = playerData;
+                        }
                     }
                 }
                 
@@ -2258,9 +2273,21 @@
                     return;
                 }
                 
-                // 既存プレイヤーの手番を確認
-                const existingPlayer = Object.values(activePlayers)[0];
-                const mySide = existingPlayer ? (existingPlayer.side === 'sente' ? 'gote' : 'sente') : 'sente';
+                // 既存プレイヤーの手番を確認（エラー対策を強化）
+                let mySide = 'sente';  // デフォルトは先手
+                const existingPlayersArray = Object.values(activePlayers);
+                if (existingPlayersArray.length > 0) {
+                    const firstPlayer = existingPlayersArray[0];
+                    if (firstPlayer && firstPlayer.side) {
+                        mySide = firstPlayer.side === 'sente' ? 'gote' : 'sente';
+                    }
+                }
+                
+                console.log('ルーム参加情報:', {
+                    activePlayerCount: activePlayerCount,
+                    existingPlayer: existingPlayersArray[0],
+                    mySide: mySide
+                });
                 
                 const playerUpdate = {};
                 playerUpdate['players/' + this.onlineState.playerId] = {
@@ -2279,19 +2306,22 @@
                         connected: this.onlineState.connected
                     });
                     
-                    // リスナーを先に設定
+                    // playerSideが設定された後でリスナーを設定
                     this.setupRoomListeners();
                     
-                    // ゲーム状態を同期（プレイヤー設定後）
+                    // ゲーム状態を同期（リスナー設定後）
                     if (roomData.gameState) {
-                        this.syncGameState(roomData.gameState);
+                        // 同期処理の前に少し待つ
+                        setTimeout(() => {
+                            this.syncGameState(roomData.gameState);
+                        }, 50);
                     }
                     
-                    // 盤面を更新（後手の場合は回転）- 少し遅延を入れる
+                    // 盤面を更新（後手の場合は回転）- さらに遅延を入れる
                     setTimeout(() => {
                         this.initBoard();
                         console.log('盤面初期化完了（後手）');
-                    }, 100);
+                    }, 200);
                     
                     this.updateConnectionStatus('connected');
                     
@@ -2321,6 +2351,11 @@
                         if (document.getElementById('chatSection').style.display !== 'block') {
                             document.getElementById('chatSection').style.display = 'block';
                             this.showNotification('対戦相手が参加しました！', 'info');
+                            // 後手の場合、相手参加時に盤面を再初期化
+                            if (this.onlineState.playerSide === 'gote' && this.onlineState.connected) {
+                                console.log('相手参加により盤面再初期化（後手）');
+                                setTimeout(() => this.initBoard(), 200);
+                            }
                         }
                     }
                     
@@ -2336,6 +2371,12 @@
                 this.firebase.currentRoomRef.child('gameState').on('value', (snapshot) => {
                     const newGameState = snapshot.val();
                     if (newGameState && this.onlineState.connected && !this.onlineState.syncInProgress) {
+                        // playerSideが設定されていない場合はスキップ（初回参加時）
+                        if (!this.onlineState.playerSide) {
+                            console.log('playerSide未設定のため、gameState監視をスキップ');
+                            return;
+                        }
+                        
                         // バージョンチェックで重複同期を防ぐ
                         if (newGameState.version > this.onlineState.lastSyncVersion) {
                             this.onlineState.lastSyncVersion = newGameState.version;
@@ -2637,7 +2678,13 @@
                     // 後手の場合は盤面回転の説明を追加
                     if (this.onlineState.playerSide === 'gote') {
                         turnIndicator.innerHTML += ` <small style="color: #9b59b6;">[盤面回転中]</small>`;
+                        // 視点切替ボタンを表示
+                        document.getElementById('viewToggle').style.display = 'inline-block';
+                    } else {
+                        document.getElementById('viewToggle').style.display = 'none';
                     }
+                } else {
+                    document.getElementById('viewToggle').style.display = 'none';
                 }
                 
                 document.getElementById('moveCount').textContent = this.gameState.moveHistory.length;
@@ -2742,6 +2789,18 @@
                 if (this.onlineState.connected) {
                     this.leaveRoom();
                 }
+                
+                // オンライン状態をリセット
+                this.onlineState = {
+                    connected: false,
+                    roomId: null,
+                    isHost: false,
+                    playerId: this.onlineState.playerId || Math.random().toString(36).substr(2, 9),
+                    opponentId: null,
+                    playerSide: null,
+                    syncInProgress: false,
+                    lastSyncVersion: 0
+                };
                 
                 this.gameState = {
                     board: JSON.parse(JSON.stringify(this.CONSTANTS.INITIAL_BOARD)),
@@ -2855,6 +2914,28 @@
                 this.showNotification('棋譜を保存しました', 'info');
             },
             
+            toggleView() {
+                // オンラインモードの後手プレイヤーのみ視点切替可能
+                if (this.gameState.isOnlineMode && this.onlineState.connected && this.onlineState.playerSide === 'gote') {
+                    const board = document.getElementById('board');
+                    const captures = document.querySelector('.captures');
+                    const boardContainer = document.querySelector('.board-container');
+                    
+                    if (board.classList.contains('rotated')) {
+                        board.classList.remove('rotated');
+                        captures.classList.remove('rotated');
+                        this.showNotification('先手視点に切り替えました', 'info');
+                    } else {
+                        board.classList.add('rotated');
+                        captures.classList.add('rotated');
+                        this.showNotification('後手視点に切り替えました', 'info');
+                    }
+                    
+                    // 座標を更新
+                    this.addBoardCoordinates(boardContainer, board.classList.contains('rotated'));
+                }
+            },
+            
             closeModal() {
                 document.querySelectorAll('.modal').forEach((modal) => {
                     modal.classList.remove('show');
@@ -2875,7 +2956,8 @@
             confirmPromotion: (promote) => ShogiApp.confirmPromotion(promote),
             joinRoom: () => ShogiApp.joinRoom(),
             leaveRoom: () => ShogiApp.leaveRoom(),
-            sendChatMessage: () => ShogiApp.sendChatMessage()
+            sendChatMessage: () => ShogiApp.sendChatMessage(),
+            toggleView: () => ShogiApp.toggleView()
         };
         
         // 初期化

@@ -183,10 +183,30 @@
             box-shadow: 0 4px 20px rgba(0,0,0,0.3);
             transition: transform 0.5s ease;
             position: relative;
+            transform-origin: center center;
         }
         
         .board.rotated {
-            transform: rotate(180deg);
+            transform: rotate(180deg) !important;
+        }
+        
+        /* デバッグ用：回転を確認しやすくする */
+        .board.rotated::after {
+            content: "後手視点";
+            position: absolute;
+            top: -30px;
+            left: 50%;
+            transform: translateX(-50%) rotate(180deg);
+            background: #9b59b6;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 3px;
+            font-size: 10px;
+        }
+        
+        /* 駒台の回転 */
+        .captures.rotated {
+            flex-direction: row-reverse !important;
         }
         
         /* 座標表示 */
@@ -425,6 +445,11 @@
             background: #85c1e9;
             border-color: #3498db;
             box-shadow: 0 0 5px rgba(52, 152, 219, 0.5);
+        }
+        
+        /* 駒台の回転 */
+        .captures.rotated {
+            flex-direction: row-reverse !important;
         }
         
         /* ============================================
@@ -1125,6 +1150,10 @@
                 if (shouldReverse) {
                     board.classList.add('rotated');
                     captures.classList.add('rotated');
+                    
+                    // デバッグ：スタイルを直接適用してみる
+                    board.style.transform = 'rotate(180deg)';
+                    
                     // 視点インジケーターを追加
                     if (!document.getElementById('viewIndicator')) {
                         const indicator = document.createElement('div');
@@ -1140,16 +1169,20 @@
                         indicator.textContent = '🔄 後手視点（盤面回転中）';
                         boardContainer.insertBefore(indicator, boardContainer.firstChild);
                     }
-                    console.log('盤面を後手視点に回転しました');
+                    console.log('盤面を後手視点に回転しました - classList:', board.classList.toString());
                 } else {
                     board.classList.remove('rotated');
                     captures.classList.remove('rotated');
+                    
+                    // デバッグ：スタイルをリセット
+                    board.style.transform = '';
+                    
                     // 視点インジケーターを削除
                     const indicator = document.getElementById('viewIndicator');
                     if (indicator) {
                         indicator.remove();
                     }
-                    console.log('盤面を先手視点に設定しました');
+                    console.log('盤面を先手視点に設定しました - classList:', board.classList.toString());
                 }
                 
                 // 座標表示を追加
@@ -2309,11 +2342,11 @@
                     // playerSideが設定された後でリスナーを設定
                     this.setupRoomListeners();
                     
-                    // ゲーム状態を同期（リスナー設定後）
+                    // ゲーム状態を同期（リスナー設定後）- 初回はボード初期化をスキップ
                     if (roomData.gameState) {
                         // 同期処理の前に少し待つ
                         setTimeout(() => {
-                            this.syncGameState(roomData.gameState);
+                            this.syncGameState(roomData.gameState, true); // skipBoardInit = true
                         }, 50);
                     }
                     
@@ -2398,14 +2431,15 @@
                 this.firebase.currentRoomRef.child('players').child(this.onlineState.playerId).onDisconnect().remove();
             },
             
-            syncGameState(newGameState) {
+            syncGameState(newGameState, skipBoardInit = false) {
                 try {
                     // 同期開始
                     this.onlineState.syncInProgress = true;
                     
                     console.log('ゲーム状態同期開始:', {
                         playerSide: this.onlineState.playerSide,
-                        connected: this.onlineState.connected
+                        connected: this.onlineState.connected,
+                        skipBoardInit: skipBoardInit
                     });
                     
                     const newMoveHistory = JSON.parse(newGameState.moveHistory);
@@ -2449,10 +2483,10 @@
                     }
                     
                     // playerSideが設定されていることを確認してから画面更新
-                    if (this.onlineState.playerSide) {
+                    if (!skipBoardInit && this.onlineState.playerSide) {
                         this.initBoard();
                         this.updateMoveDisplay();
-                    } else {
+                    } else if (!skipBoardInit) {
                         console.warn('playerSideが未設定のため、盤面更新をスキップ');
                     }
                     
@@ -2923,10 +2957,12 @@
                     
                     if (board.classList.contains('rotated')) {
                         board.classList.remove('rotated');
+                        board.style.transform = '';
                         captures.classList.remove('rotated');
                         this.showNotification('先手視点に切り替えました', 'info');
                     } else {
                         board.classList.add('rotated');
+                        board.style.transform = 'rotate(180deg)';
                         captures.classList.add('rotated');
                         this.showNotification('後手視点に切り替えました', 'info');
                     }

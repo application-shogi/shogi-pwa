@@ -1099,9 +1099,19 @@
             // 盤面表示関数
             // ============================================
             shouldRotateBoard() {
-                return this.gameState.isOnlineMode && 
-                       this.onlineState.connected && 
-                       this.onlineState.playerSide === 'gote';
+                const shouldRotate = this.gameState.isOnlineMode && 
+                                   this.onlineState.connected && 
+                                   this.onlineState.playerSide === 'gote';
+                
+                // デバッグ情報
+                console.log('盤面回転チェック:', {
+                    isOnlineMode: this.gameState.isOnlineMode,
+                    connected: this.onlineState.connected,
+                    playerSide: this.onlineState.playerSide,
+                    shouldRotate: shouldRotate
+                });
+                
+                return shouldRotate;
             },
             
             initBoard() {
@@ -2264,6 +2274,11 @@
                     this.onlineState.playerSide = mySide;
                     this.onlineState.lastSyncVersion = roomData.gameState.version || 0;
                     
+                    console.log('後手として参加:', {
+                        playerSide: this.onlineState.playerSide,
+                        connected: this.onlineState.connected
+                    });
+                    
                     // リスナーを先に設定
                     this.setupRoomListeners();
                     
@@ -2272,8 +2287,11 @@
                         this.syncGameState(roomData.gameState);
                     }
                     
-                    // 盤面を更新（後手の場合は回転）
-                    this.initBoard();
+                    // 盤面を更新（後手の場合は回転）- 少し遅延を入れる
+                    setTimeout(() => {
+                        this.initBoard();
+                        console.log('盤面初期化完了（後手）');
+                    }, 100);
                     
                     this.updateConnectionStatus('connected');
                     
@@ -2344,6 +2362,11 @@
                     // 同期開始
                     this.onlineState.syncInProgress = true;
                     
+                    console.log('ゲーム状態同期開始:', {
+                        playerSide: this.onlineState.playerSide,
+                        connected: this.onlineState.connected
+                    });
+                    
                     const newMoveHistory = JSON.parse(newGameState.moveHistory);
                     
                     // 新しい手があるかチェック
@@ -2384,9 +2407,13 @@
                         this.rebuildPieceOwners();
                     }
                     
-                    // 画面更新
-                    this.initBoard();
-                    this.updateMoveDisplay();
+                    // playerSideが設定されていることを確認してから画面更新
+                    if (this.onlineState.playerSide) {
+                        this.initBoard();
+                        this.updateMoveDisplay();
+                    } else {
+                        console.warn('playerSideが未設定のため、盤面更新をスキップ');
+                    }
                     
                 } catch (error) {
                     console.error('ゲーム状態同期エラー:', error);

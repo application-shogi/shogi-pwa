@@ -243,8 +243,9 @@
             padding: 20px 0;
         }
         
-        .board.rotated .board-coordinates span {
-            transform: rotate(180deg);
+        /* 座標は回転させない */
+        .board-coordinates span {
+            display: block;
         }
         
         .cell {
@@ -313,8 +314,10 @@
             justify-content: center;
         }
         
+        /* 通常時の駒の向き */
         .piece.sente {
             color: #000;
+            transform: rotate(0deg);
         }
         
         .piece.gote {
@@ -326,13 +329,25 @@
             color: #d4af37;
         }
         
-        /* 後手視点（盤面回転時）での駒の向き調整 */
+        /* 後手視点（盤面回転時）での駒の向き調整 - 優先順位を上げる */
         .board.rotated .piece.sente {
-            transform: rotate(180deg);
+            transform: rotate(180deg) !important;
         }
         
         .board.rotated .piece.gote {
-            transform: rotate(0deg);
+            transform: rotate(0deg) !important;
+            color: #8b0000;
+        }
+        
+        /* 成駒の場合も同様に調整 */
+        .board.rotated .piece.sente.promoted {
+            transform: rotate(180deg) !important;
+            color: #d4af37;
+        }
+        
+        .board.rotated .piece.gote.promoted {
+            transform: rotate(0deg) !important;
+            color: #d4af37;
         }
         
         /* 猫モード用スタイル */
@@ -1043,11 +1058,18 @@
                     this.gameState.pieceOwners[row] = [];
                     for (let col = 0; col < 9; col++) {
                         if (this.gameState.board[row][col] !== '') {
+                            // row 0-2 が後手、row 6-8 が先手
                             this.gameState.pieceOwners[row][col] = row <= 2 ? 'gote' : 'sente';
                         } else {
                             this.gameState.pieceOwners[row][col] = null;
                         }
                     }
+                }
+                
+                // デバッグ：初期配置の確認
+                console.log('初期駒配置:');
+                for (let row = 0; row < 3; row++) {
+                    console.log(`Row ${row}: ${this.gameState.board[row].join(' ')}`);
                 }
             },
             
@@ -1139,6 +1161,13 @@
                 // 後手の場合は盤面を回転
                 const shouldReverse = this.shouldRotateBoard();
                 
+                // デバッグ情報
+                console.log('盤面初期化:', {
+                    shouldReverse: shouldReverse,
+                    playerSide: this.onlineState.playerSide,
+                    boardInitialized: this.onlineState.boardInitialized
+                });
+                
                 // クラスの設定を確実に行う
                 if (shouldReverse) {
                     // 既存のクラスを保持しつつrotatedを追加
@@ -1174,6 +1203,18 @@
                 
                 // 座標表示を追加
                 this.addBoardCoordinates(boardContainer, shouldReverse);
+                
+                // 駒の所有者情報をデバッグ出力
+                if (shouldReverse) {
+                    console.log('駒の所有者情報:');
+                    for (let row = 0; row < 3; row++) {
+                        const owners = [];
+                        for (let col = 0; col < 9; col++) {
+                            owners.push(this.gameState.pieceOwners[row][col] || '-');
+                        }
+                        console.log(`Row ${row}: ${owners.join(' ')}`);
+                    }
+                }
                 
                 // 後手視点の場合、盤面を逆順で描画
                 for (let displayRow = 0; displayRow < 9; displayRow++) {
@@ -1231,7 +1272,9 @@
                 cols.forEach(num => {
                     const span = document.createElement('span');
                     span.textContent = num;
-                    if (isRotated) span.style.transform = 'rotate(180deg)';
+                    span.style.display = 'inline-block';
+                    span.style.width = '45px';
+                    span.style.textAlign = 'center';
                     topCoord.appendChild(span);
                 });
                 boardContainer.appendChild(topCoord);
@@ -1243,7 +1286,9 @@
                 rows.forEach(kanji => {
                     const span = document.createElement('span');
                     span.textContent = kanji;
-                    if (isRotated) span.style.transform = 'rotate(180deg)';
+                    span.style.display = 'block';
+                    span.style.height = '45px';
+                    span.style.lineHeight = '45px';
                     leftCoord.appendChild(span);
                 });
                 boardContainer.appendChild(leftCoord);
@@ -1252,7 +1297,20 @@
             createPieceElement(piece, row, col) {
                 const pieceElement = document.createElement('div');
                 const owner = this.gameState.pieceOwners[row][col];
-                pieceElement.className = 'piece ' + owner;
+                
+                // 駒の所有者を確実に設定
+                if (!owner) {
+                    console.error(`駒の所有者が未定義: ${piece} at (${row},${col})`);
+                    return pieceElement;
+                }
+                
+                // クラス名を設定
+                pieceElement.className = `piece ${owner}`;
+                
+                // デバッグ情報（後手視点時のみ）
+                if (this.shouldRotateBoard() && (row === 0 || row === 8)) {
+                    console.log(`駒: ${piece}, 位置: (${row},${col}), 所有者: ${owner}, クラス: ${pieceElement.className}`);
+                }
                 
                 if (this.CONSTANTS.ORIGINAL_PIECES[piece]) {
                     pieceElement.classList.add('promoted');
@@ -1305,9 +1363,15 @@
                 
                 // 後手視点での駒台の名前更新
                 if (this.shouldRotateBoard()) {
-                    senteNameDiv.textContent = '⚫ 先手の駒台（相手）';
+                    // 後手視点の場合：上が相手（先手）、下が自分（後手）
                     goteNameDiv.textContent = '🔴 後手の駒台（あなた）';
+                    senteNameDiv.textContent = '⚫ 先手の駒台（相手）';
+                } else if (this.gameState.isOnlineMode && this.onlineState.connected && this.onlineState.playerSide === 'sente') {
+                    // 先手視点でオンラインの場合
+                    senteNameDiv.textContent = '⚫ 先手の駒台（あなた）';
+                    goteNameDiv.textContent = '🔴 後手の駒台（相手）';
                 } else {
+                    // 通常のローカル対戦
                     senteNameDiv.textContent = '⚫ 先手の駒台';
                     goteNameDiv.textContent = '🔴 後手の駒台';
                 }

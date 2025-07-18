@@ -168,12 +168,6 @@
         .board-container {
             position: relative;
             margin: 20px 0;
-            transition: transform 0.5s ease;
-        }
-        
-        /* 盤面全体の回転 */
-        .board-container.rotated {
-            transform: rotate(180deg);
         }
         
         /* ============================================
@@ -1155,28 +1149,24 @@
                     boardInitialized: this.onlineState.boardInitialized
                 });
                 
-                // クラスの設定を確実に行う
+                // 後手視点の設定（CSSの回転を削除）
                 if (shouldReverse) {
-                    // 既存のクラスを保持しつつrotatedを追加
-                    if (!boardContainer.classList.contains('rotated')) {
-                        boardContainer.classList.add('rotated');
-                    }
-                    if (!captures.classList.contains('rotated')) {
-                        captures.classList.add('rotated');
-                    }
-                    
                     // 視点インジケーターを追加
                     if (!document.getElementById('viewIndicator')) {
                         const indicator = document.createElement('div');
                         indicator.id = 'viewIndicator';
-                        indicator.textContent = '🔄 後手視点（盤面回転中）';
+                        indicator.textContent = '🔄 後手視点';
                         boardContainer.insertBefore(indicator, boardContainer.firstChild);
                     }
                     
-                    console.log('盤面を後手視点に回転しました');
+                    // 駒台の順序を逆にする
+                    if (!captures.classList.contains('rotated')) {
+                        captures.classList.add('rotated');
+                    }
+                    
+                    console.log('後手視点で盤面を描画します');
                 } else {
-                    // rotatedクラスを削除
-                    boardContainer.classList.remove('rotated');
+                    // 先手視点の設定
                     captures.classList.remove('rotated');
                     
                     // 視点インジケーターを削除
@@ -1185,44 +1175,64 @@
                         indicator.remove();
                     }
                     
-                    console.log('盤面を先手視点に設定しました');
+                    console.log('先手視点で盤面を描画します');
                 }
                 
                 // 座標表示を追加
                 this.addBoardCoordinates(boardContainer, shouldReverse);
                 
-                // デバッグ：駒の配置確認
-                console.log('駒の配置（後手視点）:', shouldReverse);
-                
-                // 後手視点の場合、盤面を逆順で描画
-                for (let displayRow = 0; displayRow < 9; displayRow++) {
-                    for (let displayCol = 0; displayCol < 9; displayCol++) {
-                        // 実際のゲーム座標を計算
-                        const gameRow = shouldReverse ? (8 - displayRow) : displayRow;
-                        const gameCol = shouldReverse ? (8 - displayCol) : displayCol;
-                        
-                        const cell = document.createElement('div');
-                        cell.className = 'cell';
-                        cell.dataset.row = displayRow;
-                        cell.dataset.col = displayCol;
-                        
-                        // デバッグ：特定のセルの情報を出力
-                        if (shouldReverse && displayRow === 0 && displayCol === 0) {
-                            console.log(`左上のセル: display(${displayRow},${displayCol}) → game(${gameRow},${gameCol})`);
-                            console.log(`駒: ${this.gameState.board[gameRow][gameCol]}`);
+                // 盤面を描画
+                if (shouldReverse) {
+                    // 後手視点：右下から左上へ描画（座標を完全に反転）
+                    for (let displayRow = 0; displayRow < 9; displayRow++) {
+                        for (let displayCol = 0; displayCol < 9; displayCol++) {
+                            // 後手視点では8-row, 8-colの位置の駒を表示
+                            const gameRow = 8 - displayRow;
+                            const gameCol = 8 - displayCol;
+                            
+                            const cell = document.createElement('div');
+                            cell.className = 'cell';
+                            cell.dataset.row = displayRow;
+                            cell.dataset.col = displayCol;
+                            cell.dataset.gameRow = gameRow;
+                            cell.dataset.gameCol = gameCol;
+                            
+                            cell.addEventListener('click', () => {
+                                this.handleCellClick(gameRow, gameCol);
+                            });
+                            
+                            const piece = this.gameState.board[gameRow][gameCol];
+                            if (piece) {
+                                const pieceElement = this.createPieceElement(piece, gameRow, gameCol);
+                                cell.appendChild(pieceElement);
+                            }
+                            
+                            board.appendChild(cell);
                         }
-                        
-                        cell.addEventListener('click', () => {
-                            this.handleCellClick(gameRow, gameCol);
-                        });
-                        
-                        const piece = this.gameState.board[gameRow][gameCol];
-                        if (piece) {
-                            const pieceElement = this.createPieceElement(piece, gameRow, gameCol);
-                            cell.appendChild(pieceElement);
+                    }
+                } else {
+                    // 先手視点：通常通り左上から右下へ描画
+                    for (let row = 0; row < 9; row++) {
+                        for (let col = 0; col < 9; col++) {
+                            const cell = document.createElement('div');
+                            cell.className = 'cell';
+                            cell.dataset.row = row;
+                            cell.dataset.col = col;
+                            cell.dataset.gameRow = row;
+                            cell.dataset.gameCol = col;
+                            
+                            cell.addEventListener('click', () => {
+                                this.handleCellClick(row, col);
+                            });
+                            
+                            const piece = this.gameState.board[row][col];
+                            if (piece) {
+                                const pieceElement = this.createPieceElement(piece, row, col);
+                                cell.appendChild(pieceElement);
+                            }
+                            
+                            board.appendChild(cell);
                         }
-                        
-                        board.appendChild(cell);
                     }
                 }
                 

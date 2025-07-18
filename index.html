@@ -316,6 +316,7 @@
         /* 通常時の駒の向き */
         .piece.sente {
             color: #000;
+            transform: rotate(0deg);
         }
         
         .piece.gote {
@@ -327,13 +328,13 @@
             color: #d4af37;
         }
         
-        /* 盤面回転時の駒の向き調整 */
-        .board-container.rotated .piece {
-            transform: rotate(180deg);
+        /* 盤面回転時の駒の向き調整 - 重要: transformを上書き */
+        .board-container.rotated .piece.sente {
+            transform: rotate(180deg) !important;
         }
         
         .board-container.rotated .piece.gote {
-            transform: rotate(0deg);
+            transform: rotate(0deg) !important;
         }
         
         /* 猫モード用スタイル */
@@ -1190,17 +1191,8 @@
                 // 座標表示を追加
                 this.addBoardCoordinates(boardContainer, shouldReverse);
                 
-                // 駒の所有者情報をデバッグ出力
-                if (shouldReverse) {
-                    console.log('駒の所有者情報:');
-                    for (let row = 0; row < 3; row++) {
-                        const owners = [];
-                        for (let col = 0; col < 9; col++) {
-                            owners.push(this.gameState.pieceOwners[row][col] || '-');
-                        }
-                        console.log(`Row ${row}: ${owners.join(' ')}`);
-                    }
-                }
+                // デバッグ：駒の配置確認
+                console.log('駒の配置（後手視点）:', shouldReverse);
                 
                 // 後手視点の場合、盤面を逆順で描画
                 for (let displayRow = 0; displayRow < 9; displayRow++) {
@@ -1213,6 +1205,13 @@
                         cell.className = 'cell';
                         cell.dataset.row = displayRow;
                         cell.dataset.col = displayCol;
+                        
+                        // デバッグ：特定のセルの情報を出力
+                        if (shouldReverse && displayRow === 0 && displayCol === 0) {
+                            console.log(`左上のセル: display(${displayRow},${displayCol}) → game(${gameRow},${gameCol})`);
+                            console.log(`駒: ${this.gameState.board[gameRow][gameCol]}`);
+                        }
+                        
                         cell.addEventListener('click', () => {
                             this.handleCellClick(gameRow, gameCol);
                         });

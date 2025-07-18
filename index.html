@@ -1038,12 +1038,6 @@
                         }
                     }
                 }
-                
-                // デバッグ：初期配置の確認
-                console.log('初期駒配置:');
-                for (let row = 0; row < 3; row++) {
-                    console.log(`Row ${row}: ${this.gameState.board[row].join(' ')}`);
-                }
             },
             
             initEventHandlers() {
@@ -1113,15 +1107,6 @@
                                    this.onlineState.boardInitialized &&
                                    this.onlineState.playerSide === 'gote';
                 
-                // デバッグ情報
-                console.log('盤面回転チェック:', {
-                    isOnlineMode: this.gameState.isOnlineMode,
-                    connected: this.onlineState.connected,
-                    boardInitialized: this.onlineState.boardInitialized,
-                    playerSide: this.onlineState.playerSide,
-                    shouldRotate: shouldRotate
-                });
-                
                 return shouldRotate;
             },
             
@@ -1133,13 +1118,6 @@
                 
                 // 後手の場合は盤面を回転
                 const shouldReverse = this.shouldRotateBoard();
-                
-                // デバッグ情報
-                console.log('盤面初期化:', {
-                    shouldReverse: shouldReverse,
-                    playerSide: this.onlineState.playerSide,
-                    boardInitialized: this.onlineState.boardInitialized
-                });
                 
                 // 後手視点の設定（CSSの回転を削除）
                 if (shouldReverse) {
@@ -1155,8 +1133,6 @@
                     if (!captures.classList.contains('rotated')) {
                         captures.classList.add('rotated');
                     }
-                    
-                    console.log('後手視点で盤面を描画します');
                 } else {
                     // 先手視点の設定
                     captures.classList.remove('rotated');
@@ -1166,8 +1142,6 @@
                     if (indicator) {
                         indicator.remove();
                     }
-                    
-                    console.log('先手視点で盤面を描画します');
                 }
                 
                 // 座標表示を追加
@@ -1287,7 +1261,6 @@
                 
                 // 駒の所有者を確実に設定
                 if (!owner) {
-                    console.error(`駒の所有者が未定義: ${piece} at (${row},${col})`);
                     return pieceElement;
                 }
                 
@@ -1339,7 +1312,6 @@
                     const parent = img.parentElement;
                     parent.innerHTML = '';
                     parent.textContent = piece;
-                    console.warn('猫画像が読み込めませんでした:', catData.image);
                 };
                 
                 return img;
@@ -2259,7 +2231,6 @@
                         // 古いルームデータをチェック（1時間以上前のものは削除）
                         const roomAge = roomData.createdAt ? Date.now() - roomData.createdAt : 0;
                         if (roomAge > 3600000) { // 1時間 = 3600000ミリ秒
-                            console.log('古いルームデータを検出。新しいルームを作成します。');
                             this.createRoom(roomId, password);
                         } else {
                             // 既存のルームに参加
@@ -2340,19 +2311,12 @@
                     this.onlineState.lastSyncVersion = 1;
                     this.onlineState.boardInitialized = true;
                     
-                    console.log('新しいルームを作成（盤面を完全初期化）:', {
-                        playerSide: this.onlineState.playerSide,
-                        connected: this.onlineState.connected,
-                        boardInitialized: this.onlineState.boardInitialized
-                    });
-                    
                     this.setupRoomListeners();
                     this.updateConnectionStatus('connected');
                     
                     // 先手として盤面を更新（回転なし）
                     setTimeout(() => {
                         this.initBoard();
-                        console.log('盤面初期化完了（先手）');
                     }, 100);
                     
                     document.getElementById('joinRoomBtn').style.display = 'none';
@@ -2368,8 +2332,6 @@
             },
             
             joinExistingRoom(roomId, roomData) {
-                console.log('既存ルーム参加開始:', roomData);
-                
                 const players = roomData.players || {};
                 
                 // アクティブなプレイヤーのみをカウント（古いセッションのクリーンアップ）
@@ -2410,12 +2372,6 @@
                     }
                 }
                 
-                console.log('ルーム参加情報:', {
-                    activePlayerCount: activePlayerCount,
-                    existingPlayer: existingPlayersArray[0],
-                    mySide: mySide
-                });
-                
                 const playerUpdate = {};
                 playerUpdate['players/' + this.onlineState.playerId] = {
                     side: mySide,
@@ -2427,12 +2383,6 @@
                     this.onlineState.isHost = false;
                     this.onlineState.playerSide = mySide;
                     this.onlineState.lastSyncVersion = roomData.gameState.version || 0;
-                    
-                    console.log('後手として参加（設定前）:', {
-                        playerSide: this.onlineState.playerSide,
-                        connected: this.onlineState.connected,
-                        boardInitialized: this.onlineState.boardInitialized
-                    });
                     
                     // playerSideが設定された後でリスナーを設定
                     this.setupRoomListeners();
@@ -2449,10 +2399,6 @@
                     setTimeout(() => {
                         this.onlineState.boardInitialized = true;
                         this.initBoard();
-                        console.log('盤面初期化完了（後手）:', {
-                            playerSide: this.onlineState.playerSide,
-                            boardInitialized: this.onlineState.boardInitialized
-                        });
                     }, 200);
                     
                     this.updateConnectionStatus('connected');
@@ -2485,7 +2431,6 @@
                             this.showNotification('対戦相手が参加しました！', 'info');
                             // 後手の場合、相手参加時に盤面を再初期化
                             if (this.onlineState.playerSide === 'gote' && this.onlineState.connected) {
-                                console.log('相手参加により盤面再初期化（後手）');
                                 setTimeout(() => this.initBoard(), 200);
                             }
                         }
@@ -2505,7 +2450,6 @@
                     if (newGameState && this.onlineState.connected && !this.onlineState.syncInProgress) {
                         // playerSideが設定されていない場合はスキップ（初回参加時）
                         if (!this.onlineState.playerSide) {
-                            console.log('playerSide未設定のため、gameState監視をスキップ');
                             return;
                         }
                         
@@ -2534,12 +2478,6 @@
                 try {
                     // 同期開始
                     this.onlineState.syncInProgress = true;
-                    
-                    console.log('ゲーム状態同期開始:', {
-                        playerSide: this.onlineState.playerSide,
-                        connected: this.onlineState.connected,
-                        skipBoardInit: skipBoardInit
-                    });
                     
                     const newMoveHistory = JSON.parse(newGameState.moveHistory);
                     
@@ -2585,8 +2523,6 @@
                     if (!skipBoardInit && this.onlineState.playerSide && this.onlineState.boardInitialized) {
                         this.initBoard();
                         this.updateMoveDisplay();
-                    } else if (!skipBoardInit) {
-                        console.warn('playerSideまたはboardInitializedが未設定のため、盤面更新をスキップ');
                     }
                     
                 } catch (error) {
@@ -2844,23 +2780,53 @@
                     const moveElement = document.createElement('div');
                     let moveText = `${i + 1}. `;
                     
+                    // 手番を表示
+                    const turnText = (i % 2 === 0) ? '▲' : '△';
+                    moveText += turnText;
+                    
                     if (move.drop) {
-                        moveText += `${move.piece}打${move.to}`;
+                        // 打ち手の場合
+                        const col = 9 - parseInt(move.to.charAt(1));
+                        const row = parseInt(move.to.charAt(0)) + 1;
+                        const rowKanji = this.numberToKanji(row);
+                        moveText += `${col}${rowKanji}${move.piece}打`;
                     } else {
-                        moveText += `${move.piece}${move.from}→${move.to}`;
+                        // 移動の場合
+                        const toCol = 9 - parseInt(move.to.charAt(1));
+                        const toRow = parseInt(move.to.charAt(0)) + 1;
+                        const toRowKanji = this.numberToKanji(toRow);
+                        
+                        moveText += `${toCol}${toRowKanji}${move.piece}`;
+                        
                         if (move.captured) {
-                            moveText += `(${move.captured})`;
+                            moveText += `(${move.captured}取)`;
                         }
                         if (move.promoted) {
                             moveText += '成';
                         }
+                        
+                        // 元の位置を表示（簡略版）
+                        const fromCol = 9 - parseInt(move.from.charAt(1));
+                        const fromRow = parseInt(move.from.charAt(0)) + 1;
+                        moveText += `(${fromCol}${fromRow})`;
                     }
                     
                     moveElement.textContent = moveText;
+                    moveElement.style.padding = '2px 5px';
+                    if (i === this.gameState.moveHistory.length - 1) {
+                        moveElement.style.background = '#e3f2fd';
+                        moveElement.style.fontWeight = 'bold';
+                    }
                     historyDiv.appendChild(moveElement);
                 });
                 
                 historyDiv.scrollTop = historyDiv.scrollHeight;
+            },
+            
+            // 数字を漢字に変換するヘルパー関数
+            numberToKanji(num) {
+                const kanjiNumbers = ['', '一', '二', '三', '四', '五', '六', '七', '八', '九'];
+                return kanjiNumbers[num] || num;
             },
             
             showGameOver(title, message) {
@@ -3084,7 +3050,6 @@
                     this.firebase.database.ref('rooms/' + roomId).remove()
                         .then(() => {
                             this.showNotification('ルームデータをクリアしました', 'info');
-                            console.log('ルームキャッシュをクリア:', roomId);
                         })
                         .catch((error) => {
                             console.error('キャッシュクリアエラー:', error);

@@ -322,15 +322,6 @@
             color: #d4af37;
         }
         
-        /* 盤面回転時の駒の向き調整 - 重要: transformを上書き */
-        .board-container.rotated .piece.sente {
-            transform: rotate(180deg) !important;
-        }
-        
-        .board-container.rotated .piece.gote {
-            transform: rotate(0deg) !important;
-        }
-        
         /* 猫モード用スタイル */
         .piece img {
             width: 100%;
@@ -1302,9 +1293,15 @@
                 // クラス名を設定
                 pieceElement.className = `piece ${owner}`;
                 
-                // デバッグ情報（後手視点時のみ）
-                if (this.shouldRotateBoard() && (row === 0 || row === 8)) {
-                    console.log(`駒: ${piece}, 位置: (${row},${col}), 所有者: ${owner}, クラス: ${pieceElement.className}`);
+                // 後手視点での駒の向き調整
+                const isGoteView = this.shouldRotateBoard();
+                if (isGoteView) {
+                    // 後手視点の場合、先手と後手の向きを反転
+                    if (owner === 'sente') {
+                        pieceElement.style.transform = 'rotate(180deg)';
+                    } else {
+                        pieceElement.style.transform = 'rotate(0deg)';
+                    }
                 }
                 
                 if (this.CONSTANTS.ORIGINAL_PIECES[piece]) {

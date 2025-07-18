@@ -168,6 +168,12 @@
         .board-container {
             position: relative;
             margin: 20px 0;
+            transition: transform 0.5s ease;
+        }
+        
+        /* 盤面全体の回転 */
+        .board-container.rotated {
+            transform: rotate(180deg);
         }
         
         /* ============================================
@@ -181,24 +187,8 @@
             background: #654321;
             border: 3px solid #8a5536;
             box-shadow: 0 4px 20px rgba(0,0,0,0.3);
-            transition: transform 0.5s ease;
             position: relative;
-            transform-origin: center center;
         }
-        
-        /* 重要：回転の優先順位を上げる */
-        .board-container {
-    transition: transform 0.5s ease;
-}
-
-.board-container.rotated {
-    transform: rotate(180deg);
-}
-
-/* 駒の向きを調整 */
-.board-container.rotated .piece {
-    transform: rotate(180deg);
-}
         
         /* 視点インジケーター */
         #viewIndicator {
@@ -326,7 +316,6 @@
         /* 通常時の駒の向き */
         .piece.sente {
             color: #000;
-            transform: rotate(0deg);
         }
         
         .piece.gote {
@@ -338,20 +327,13 @@
             color: #d4af37;
         }
         
-        /* 後手視点（盤面回転時）での駒の向き調整 - 優先順位を上げる */
+        /* 盤面回転時の駒の向き調整 */
         .board-container.rotated .piece {
-    transform: rotate(180deg);
-}
-        
-        /* 成駒の場合も同様に調整 */
-        .board.rotated .piece.sente.promoted {
-            transform: rotate(180deg) !important;
-            color: #d4af37;
+            transform: rotate(180deg);
         }
         
-        .board.rotated .piece.gote.promoted {
-            transform: rotate(0deg) !important;
-            color: #d4af37;
+        .board-container.rotated .piece.gote {
+            transform: rotate(0deg);
         }
         
         /* 猫モード用スタイル */
@@ -366,16 +348,16 @@
             transform: scale(1.1);
         }
         
-        /* 猫画像の向き制御（駒と同じルール） */
+        /* 猫画像の向き制御 */
         .piece.gote img {
             transform: rotate(180deg);
         }
         
-        .board.rotated .piece.sente img {
+        .board-container.rotated .piece img {
             transform: rotate(180deg);
         }
         
-        .board.rotated .piece.gote img {
+        .board-container.rotated .piece.gote img {
             transform: rotate(0deg);
         }
         
@@ -384,11 +366,11 @@
             transform: rotate(180deg) scale(1.1);
         }
         
-        .board.rotated .piece.sente img:hover {
+        .board-container.rotated .piece img:hover {
             transform: rotate(180deg) scale(1.1);
         }
         
-        .board.rotated .piece.gote img:hover {
+        .board-container.rotated .piece.gote img:hover {
             transform: rotate(0deg) scale(1.1);
         }
 
@@ -1176,8 +1158,8 @@
                 if (shouldReverse) {
                     // 既存のクラスを保持しつつrotatedを追加
                     if (!boardContainer.classList.contains('rotated')) {
-        boardContainer.classList.add('rotated');
-    }
+                        boardContainer.classList.add('rotated');
+                    }
                     if (!captures.classList.contains('rotated')) {
                         captures.classList.add('rotated');
                     }
@@ -1193,7 +1175,7 @@
                     console.log('盤面を後手視点に回転しました');
                 } else {
                     // rotatedクラスを削除
-                    board.classList.remove('rotated');
+                    boardContainer.classList.remove('rotated');
                     captures.classList.remove('rotated');
                     
                     // 視点インジケーターを削除
@@ -2679,9 +2661,9 @@
                         this.showNotification('対戦から退出しました');
                         
                         // 盤面表示をリセット（回転を解除）
-                        const board = document.getElementById('board');
+                        const boardContainer = document.querySelector('.board-container');
                         const captures = document.querySelector('.captures');
-                        board.classList.remove('rotated');
+                        boardContainer.classList.remove('rotated');
                         captures.classList.remove('rotated');
                         this.initBoard();
                         
@@ -2931,9 +2913,9 @@
                     document.getElementById('onlineSection').style.display = 'none';
                     
                     // 盤面表示をリセット（回転を解除）
-                    const board = document.getElementById('board');
+                    const boardContainer = document.querySelector('.board-container');
                     const captures = document.querySelector('.captures');
-                    board.classList.remove('rotated');
+                    boardContainer.classList.remove('rotated');
                     captures.classList.remove('rotated');
                     
                     if (this.gameState.isAIMode) {
@@ -3015,24 +2997,21 @@
             toggleView() {
                 // オンラインモードの後手プレイヤーのみ視点切替可能
                 if (this.gameState.isOnlineMode && this.onlineState.connected && this.onlineState.playerSide === 'gote') {
-                    const board = document.getElementById('board');
-                    const captures = document.querySelector('.captures');
                     const boardContainer = document.querySelector('.board-container');
+                    const captures = document.querySelector('.captures');
                     
-                    if (board.classList.contains('rotated')) {
-                        board.classList.remove('rotated');
-                        board.style.transform = '';
+                    if (boardContainer.classList.contains('rotated')) {
+                        boardContainer.classList.remove('rotated');
                         captures.classList.remove('rotated');
                         this.showNotification('先手視点に切り替えました', 'info');
                     } else {
-                        board.classList.add('rotated');
-                        board.style.transform = 'rotate(180deg)';
+                        boardContainer.classList.add('rotated');
                         captures.classList.add('rotated');
                         this.showNotification('後手視点に切り替えました', 'info');
                     }
                     
                     // 座標を更新
-                    this.addBoardCoordinates(boardContainer, board.classList.contains('rotated'));
+                    this.addBoardCoordinates(boardContainer, boardContainer.classList.contains('rotated'));
                 }
             },
             

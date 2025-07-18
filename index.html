@@ -733,6 +733,7 @@
                 <input type="password" id="roomPassword" placeholder="対戦パスワード（同じパスワードの人と対戦）" maxlength="20">
                 <button class="button primary" onclick="gameController.joinRoom()" id="joinRoomBtn">対戦開始</button>
                 <button class="button danger" onclick="gameController.leaveRoom()" id="leaveRoomBtn" style="display: none;">退室</button>
+                <button class="button" onclick="gameController.clearRoomCache()" title="古いルームデータをクリア">🗑️ キャッシュクリア</button>
             </div>
             <div style="font-size: 12px; opacity: 0.8;">
                 同じパスワードを入力した人同士で自動的に対戦が始まります
@@ -2234,6 +2235,12 @@
                     return;
                 }
                 
+                // 既存の接続をクリーンアップ
+                if (this.onlineState.connected && this.firebase.currentRoomRef) {
+                    this.firebase.currentRoomRef.off();
+                    if (this.firebase.chatRef) this.firebase.chatRef.off();
+                }
+                
                 this.updateConnectionStatus('connecting');
                 
                 const roomId = 'room_' + btoa(password).replace(/[^a-zA-Z0-9]/g, '');
@@ -2249,8 +2256,15 @@
                         // 新しいルームを作成
                         this.createRoom(roomId, password);
                     } else {
-                        // 既存のルームに参加
-                        this.joinExistingRoom(roomId, roomData);
+                        // 古いルームデータをチェック（1時間以上前のものは削除）
+                        const roomAge = roomData.createdAt ? Date.now() - roomData.createdAt : 0;
+                        if (roomAge > 3600000) { // 1時間 = 3600000ミリ秒
+                            console.log('古いルームデータを検出。新しいルームを作成します。');
+                            this.createRoom(roomId, password);
+                        } else {
+                            // 既存のルームに参加
+                            this.joinExistingRoom(roomId, roomData);
+                        }
                     }
                 }).catch((error) => {
                     console.error('ルーム確認エラー:', error);
@@ -2260,8 +2274,42 @@
             },
             
             createRoom(roomId, password) {
-                // 既存のルームデータをクリア（古いセッションの削除）
+                // 新しい初期盤面を作成
+                const freshBoard = JSON.parse(JSON.stringify(this.CONSTANTS.INITIAL_BOARD));
+                const freshPieceOwners = [];
+                
+                // 駒の所有者情報を初期化
+                for (let row = 0; row < 9; row++) {
+                    freshPieceOwners[row] = [];
+                    for (let col = 0; col < 9; col++) {
+                        if (freshBoard[row][col] !== '') {
+                            freshPieceOwners[row][col] = row <= 2 ? 'gote' : 'sente';
+                        } else {
+                            freshPieceOwners[row][col] = null;
+                        }
+                    }
+                }
+                
+                // 既存のルームデータを完全にクリア
                 this.firebase.currentRoomRef.remove().then(() => {
+                    // ゲーム状態を完全にリセット
+                    this.gameState = {
+                        board: freshBoard,
+                        turn: 'sente',
+                        selectedCell: null,
+                        selectedCapturedPiece: null,
+                        capturedPieces: { sente: [], gote: [] },
+                        moveHistory: [],
+                        gameOver: false,
+                        pieceOwners: freshPieceOwners,
+                        isAIMode: false,
+                        isOnlineMode: true,
+                        beginnerMode: this.gameState.beginnerMode,
+                        catMode: this.gameState.catMode,
+                        pendingPromotion: null,
+                        inCheck: false
+                    };
+                    
                     const roomData = {
                         password: password,
                         players: {},
@@ -2273,7 +2321,8 @@
                             gameOver: this.gameState.gameOver,
                             inCheck: this.gameState.inCheck,
                             pieceOwners: JSON.stringify(this.gameState.pieceOwners),
-                            version: 1  // バージョン管理を追加
+                            version: 1,
+                            createdAt: Date.now()  // タイムスタンプを追加
                         },
                         createdAt: firebase.database.ServerValue.TIMESTAMP
                     };
@@ -2289,9 +2338,9 @@
                     this.onlineState.isHost = true;
                     this.onlineState.playerSide = 'sente';
                     this.onlineState.lastSyncVersion = 1;
-                    this.onlineState.boardInitialized = true; // 盤面初期化済みフラグ設定
+                    this.onlineState.boardInitialized = true;
                     
-                    console.log('先手として参加:', {
+                    console.log('新しいルームを作成（盤面を完全初期化）:', {
                         playerSide: this.onlineState.playerSide,
                         connected: this.onlineState.connected,
                         boardInitialized: this.onlineState.boardInitialized
@@ -2309,7 +2358,7 @@
                     document.getElementById('joinRoomBtn').style.display = 'none';
                     document.getElementById('leaveRoomBtn').style.display = 'inline-block';
                     
-                    this.showNotification('ルームを作成しました。あなたは先手です。相手の参加を待っています...', 'info');
+                    this.showNotification('新しいルームを作成しました。あなたは先手です。相手の参加を待っています...', 'info');
                     
                 }).catch((error) => {
                     console.error('ルーム作成エラー:', error);
@@ -3021,6 +3070,31 @@
                 }
             },
             
+            clearRoomCache() {
+                const password = document.getElementById('roomPassword').value.trim();
+                
+                if (!password) {
+                    this.showNotification('パスワードを入力してください', 'warning');
+                    return;
+                }
+                
+                const roomId = 'room_' + btoa(password).replace(/[^a-zA-Z0-9]/g, '');
+                
+                if (this.firebase.database) {
+                    this.firebase.database.ref('rooms/' + roomId).remove()
+                        .then(() => {
+                            this.showNotification('ルームデータをクリアしました', 'info');
+                            console.log('ルームキャッシュをクリア:', roomId);
+                        })
+                        .catch((error) => {
+                            console.error('キャッシュクリアエラー:', error);
+                            this.showNotification('キャッシュクリアに失敗しました', 'error');
+                        });
+                } else {
+                    this.showNotification('Firebase接続が確立されていません', 'error');
+                }
+            },
+            
             closeModal() {
                 document.querySelectorAll('.modal').forEach((modal) => {
                     modal.classList.remove('show');
@@ -3042,7 +3116,8 @@
             joinRoom: () => ShogiApp.joinRoom(),
             leaveRoom: () => ShogiApp.leaveRoom(),
             sendChatMessage: () => ShogiApp.sendChatMessage(),
-            toggleView: () => ShogiApp.toggleView()
+            toggleView: () => ShogiApp.toggleView(),
+            clearRoomCache: () => ShogiApp.clearRoomCache()
         };
         
         // 初期化

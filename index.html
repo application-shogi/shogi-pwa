@@ -1,4 +1,24 @@
-<!DOCTYPE html>
+sendGameOverToOpponent() {
+                if (!this.firebase.currentRoomRef || !this.onlineState.connected) return;
+                
+                try {
+                    // ゲーム終了状態を送信
+                    const updates = {
+                        'gameState/gameOver': true,
+                        'gameState/lastUpdated': firebase.database.ServerValue.TIMESTAMP
+                    };
+                    
+                    this.firebase.currentRoomRef.update(updates).catch((error) => {
+                        console.error('ゲーム終了状態の送信エラー:', error);
+                    });
+                } catch (error) {
+                    console.error('ゲーム終了状態の送信エラー:', error);
+                }
+            },
+            
+            // ============================================
+            // UI関連
+            // ============================================<!DOCTYPE html>
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
@@ -714,7 +734,6 @@
         <div class="turn-indicator" id="turnIndicator">先手の番</div>
         <div class="game-stats">
             <span>手数: <span id="moveCount">0</span></span>
-            <span>勝率: <span id="winRate">-</span></span>
         </div>
     </div>
     
@@ -725,7 +744,7 @@
             <h3>🌐 オンライン対戦</h3>
             
             <!-- Firebase設定確認 -->
-            <div id="firebaseStatus" style="margin-bottom: 15px; padding: 10px; border-radius: 5px; font-size: 12px;">
+            <div id="firebaseStatus" style="margin-bottom: 15px; padding: 10px; border-radius: 5px; font-size: 12px; display: none;">
                 <div id="firebaseCheck">Firebase設定を確認中...</div>
             </div>
             
@@ -1026,12 +1045,7 @@
                 this.initEventHandlers();
                 this.updateConnectionStatus('disconnected');
                 
-                // Firebase設定の初期チェック
-                setTimeout(() => {
-                    if (document.getElementById('onlineSection').style.display === 'block') {
-                        this.checkFirebaseConfig();
-                    }
-                }, 100);
+                // Firebase設定の初期チェックを削除（オンラインモード選択時のみ実行）
             },
             
             initPieceOwners() {
@@ -1831,6 +1845,11 @@
                         const winner = opponent === 'sente' ? '後手' : '先手';
                         this.showGameOver(`${winner}の勝ち！`, '詰みです！');
                         this.gameState.gameOver = true;
+                        
+                        // オンラインモードの場合、ゲーム終了状態を同期
+                        if (this.gameState.isOnlineMode && this.onlineState.connected) {
+                            this.sendGameOverToOpponent();
+                        }
                     } else {
                         this.showNotification('王手！', 'warning');
                         this.gameState.inCheck = true;
@@ -2036,6 +2055,7 @@
                 
                 if (possibleMoves.length === 0) {
                     this.showGameOver('先手の勝ち！', 'CPUが投了しました');
+                    this.gameState.gameOver = true;
                     return;
                 }
                 
@@ -2081,6 +2101,12 @@
                     
                     if (validMoves.length === 0) {
                         this.showGameOver('先手の勝ち！', '詰みです！');
+                        this.gameState.gameOver = true;
+                        
+                        // オンラインモードの場合、ゲーム終了状態を同期
+                        if (this.gameState.isOnlineMode && this.onlineState.connected) {
+                            this.sendGameOverToOpponent();
+                        }
                         return;
                     }
                 } else {
@@ -2145,6 +2171,9 @@
                 const statusContainer = document.getElementById('firebaseStatus');
                 const joinBtn = document.getElementById('joinRoomBtn');
                 
+                // Firebase設定確認時のみ表示
+                statusContainer.style.display = 'block';
+                
                 try {
                     // Firebase が利用可能かチェック
                     if (typeof firebase === 'undefined') {
@@ -2168,6 +2197,11 @@
                             statusContainer.style.background = '#e8f5e8';
                             statusContainer.style.color = '#2e7d32';
                             joinBtn.disabled = false;
+                            
+                            // 接続成功後、3秒後に非表示
+                            setTimeout(() => {
+                                statusContainer.style.display = 'none';
+                            }, 3000);
                         } else {
                             statusDiv.innerHTML = '⚠️ Firebaseに接続中...';
                             statusContainer.style.background = '#fff3e0';
@@ -2547,6 +2581,21 @@
                                 this.firebase.currentRoomRef.child('gameState/rematchGame').remove();
                             }
                         });
+                    }
+                    
+                    // ゲーム終了チェック
+                    if (newGameState.gameOver && !this.gameState.gameOver) {
+                        this.gameState.gameOver = true;
+                        // 負けた側の判定
+                        const winner = this.gameState.turn === 'sente' ? '後手' : '先手';
+                        const loser = this.gameState.turn === 'sente' ? '先手' : '後手';
+                        const isLoser = this.onlineState.playerSide === this.gameState.turn;
+                        
+                        if (isLoser) {
+                            this.showGameOver(`${winner}の勝ち！`, 'あなたの負けです。');
+                        } else {
+                            this.showGameOver(`${winner}の勝ち！`, 'あなたの勝ちです！');
+                        }
                     }
                     
                     // playerSideが設定されていることを確認してから画面更新

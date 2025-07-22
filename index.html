@@ -852,8 +852,15 @@
         <div class="modal-content">
             <h2 id="gameOverTitle">ゲーム終了</h2>
             <p id="gameOverMessage"></p>
+            <div id="rematchSection" style="display: none; margin: 20px 0;">
+                <div id="rematchStatus" style="padding: 10px; background: #f0f0f0; border-radius: 5px; margin-bottom: 10px;">
+                    <span id="rematchStatusText">再戦を提案しますか？</span>
+                </div>
+                <button class="button primary" onclick="gameController.proposeRematch()" id="rematchBtn">🔄 再戦を提案</button>
+                <button class="button danger" onclick="gameController.declineRematch()" id="declineRematchBtn" style="display: none;">再戦を辞退</button>
+            </div>
             <button class="button" onclick="gameController.closeModal()">閉じる</button>
-            <button class="button success" onclick="gameController.startNewGame('human')">新しいローカル対戦</button>
+            <button class="button success" onclick="gameController.startNewGame('human')" id="newLocalGameBtn">新しいローカル対戦</button>
         </div>
     </div>
 
@@ -996,7 +1003,9 @@
                 playerSide: null,
                 syncInProgress: false,  // 同期中フラグを追加
                 lastSyncVersion: 0,     // 同期バージョン管理を追加
-                boardInitialized: false // 盤面初期化済みフラグを追加
+                boardInitialized: false, // 盤面初期化済みフラグを追加
+                rematchRequested: false, // 再戦リクエスト状態
+                opponentRematchRequested: false // 相手の再戦リクエスト状態
             },
             
             // Firebase変数
@@ -2470,6 +2479,14 @@
                     }
                 });
                 
+                // 再戦リクエスト監視
+                this.firebase.currentRoomRef.child('rematch').on('value', (snapshot) => {
+                    const rematchData = snapshot.val();
+                    if (rematchData && this.gameState.gameOver) {
+                        this.handleRematchUpdate(rematchData);
+                    }
+                });
+                
                 // 切断検知
                 this.firebase.currentRoomRef.child('players').child(this.onlineState.playerId).onDisconnect().remove();
             },
@@ -2517,6 +2534,19 @@
                     } else {
                         // 互換性のため、pieceOwnersがない場合は再計算
                         this.rebuildPieceOwners();
+                    }
+                    
+                    // 再戦ゲームの場合は手番情報も更新
+                    if (newGameState.rematchGame) {
+                        // 再戦の場合は手番情報も更新
+                        this.firebase.currentRoomRef.child('players').child(this.onlineState.playerId).once('value', (snapshot) => {
+                            const playerData = snapshot.val();
+                            if (playerData && playerData.side) {
+                                this.onlineState.playerSide = playerData.side;
+                                // 再戦フラグを削除
+                                this.firebase.currentRoomRef.child('gameState/rematchGame').remove();
+                            }
+                        });
                     }
                     
                     // playerSideが設定されていることを確認してから画面更新
@@ -2643,7 +2673,9 @@
                         this.onlineState.playerSide = null;
                         this.onlineState.syncInProgress = false;
                         this.onlineState.lastSyncVersion = 0;
-                        this.onlineState.boardInitialized = false; // 追加
+                        this.onlineState.boardInitialized = false;
+                        this.onlineState.rematchRequested = false;
+                        this.onlineState.opponentRematchRequested = false;
                         this.firebase.currentRoomRef = null;
                         this.firebase.movesRef = null;
                         this.firebase.chatRef = null;
@@ -2719,6 +2751,170 @@
                         statusElement.textContent = '❌ オフライン';
                         break;
                 }
+            },
+            
+            // ============================================
+            // 再戦機能
+            // ============================================
+            proposeRematch() {
+                if (!this.firebase.currentRoomRef || !this.onlineState.connected) return;
+                
+                this.onlineState.rematchRequested = true;
+                
+                // 再戦リクエストを送信
+                const rematchData = {};
+                rematchData[this.onlineState.playerId] = {
+                    requested: true,
+                    timestamp: firebase.database.ServerValue.TIMESTAMP
+                };
+                
+                this.firebase.currentRoomRef.child('rematch').update(rematchData).then(() => {
+                    document.getElementById('rematchBtn').style.display = 'none';
+                    document.getElementById('declineRematchBtn').style.display = 'inline-block';
+                    
+                    if (this.onlineState.opponentRematchRequested) {
+                        // 両方が再戦を希望した場合
+                        this.startRematch();
+                    } else {
+                        document.getElementById('rematchStatusText').textContent = '再戦を提案しました。相手の返答を待っています...';
+                    }
+                }).catch((error) => {
+                    console.error('再戦リクエストエラー:', error);
+                    this.showNotification('再戦リクエストの送信に失敗しました', 'error');
+                });
+            },
+            
+            declineRematch() {
+                if (!this.firebase.currentRoomRef || !this.onlineState.connected) return;
+                
+                this.onlineState.rematchRequested = false;
+                
+                // 再戦リクエストを取り消し
+                this.firebase.currentRoomRef.child('rematch').child(this.onlineState.playerId).remove().then(() => {
+                    document.getElementById('rematchBtn').style.display = 'inline-block';
+                    document.getElementById('declineRematchBtn').style.display = 'none';
+                    document.getElementById('rematchStatusText').textContent = '再戦を辞退しました';
+                    
+                    // 3秒後に状態をリセット
+                    setTimeout(() => {
+                        if (document.getElementById('gameOverModal').classList.contains('show')) {
+                            document.getElementById('rematchStatusText').textContent = '再戦を提案しますか？';
+                        }
+                    }, 3000);
+                }).catch((error) => {
+                    console.error('再戦辞退エラー:', error);
+                });
+            },
+            
+            handleRematchUpdate(rematchData) {
+                const opponentIds = Object.keys(rematchData).filter(id => id !== this.onlineState.playerId);
+                
+                if (opponentIds.length > 0 && rematchData[opponentIds[0]]?.requested) {
+                    this.onlineState.opponentRematchRequested = true;
+                    
+                    if (this.onlineState.rematchRequested) {
+                        // 両方が再戦を希望
+                        this.startRematch();
+                    } else {
+                        document.getElementById('rematchStatusText').textContent = '相手が再戦を提案しています！';
+                        document.getElementById('rematchBtn').textContent = '🔄 再戦に同意';
+                    }
+                } else {
+                    this.onlineState.opponentRematchRequested = false;
+                    if (!this.onlineState.rematchRequested) {
+                        document.getElementById('rematchStatusText').textContent = '再戦を提案しますか？';
+                        document.getElementById('rematchBtn').textContent = '🔄 再戦を提案';
+                    }
+                }
+            },
+            
+            startRematch() {
+                if (!this.firebase.currentRoomRef || !this.onlineState.connected) return;
+                
+                document.getElementById('rematchStatusText').textContent = '再戦を開始しています...';
+                
+                // 再戦データをクリア
+                this.firebase.currentRoomRef.child('rematch').remove();
+                
+                // 手番を交代（前回先手だった人が後手に）
+                const newPlayerSide = this.onlineState.playerSide === 'sente' ? 'gote' : 'sente';
+                
+                // ゲーム状態をリセット
+                const freshBoard = JSON.parse(JSON.stringify(this.CONSTANTS.INITIAL_BOARD));
+                const freshPieceOwners = [];
+                
+                for (let row = 0; row < 9; row++) {
+                    freshPieceOwners[row] = [];
+                    for (let col = 0; col < 9; col++) {
+                        if (freshBoard[row][col] !== '') {
+                            freshPieceOwners[row][col] = row <= 2 ? 'gote' : 'sente';
+                        } else {
+                            freshPieceOwners[row][col] = null;
+                        }
+                    }
+                }
+                
+                // 新しいゲーム状態
+                const newGameState = {
+                    board: JSON.stringify(freshBoard),
+                    turn: 'sente',
+                    capturedPieces: JSON.stringify({ sente: [], gote: [] }),
+                    moveHistory: JSON.stringify([]),
+                    gameOver: false,
+                    inCheck: false,
+                    pieceOwners: JSON.stringify(freshPieceOwners),
+                    version: this.onlineState.lastSyncVersion + 1,
+                    createdAt: firebase.database.ServerValue.TIMESTAMP,
+                    rematchGame: true
+                };
+                
+                // プレイヤー情報を更新
+                const updates = {
+                    gameState: newGameState
+                };
+                
+                updates['players/' + this.onlineState.playerId + '/side'] = newPlayerSide;
+                
+                // 更新を送信
+                this.firebase.currentRoomRef.update(updates).then(() => {
+                    // ローカル状態を更新
+                    this.onlineState.playerSide = newPlayerSide;
+                    this.onlineState.rematchRequested = false;
+                    this.onlineState.opponentRematchRequested = false;
+                    this.onlineState.lastSyncVersion = newGameState.version;
+                    
+                    // ゲーム状態をリセット
+                    this.gameState = {
+                        board: freshBoard,
+                        turn: 'sente',
+                        selectedCell: null,
+                        selectedCapturedPiece: null,
+                        capturedPieces: { sente: [], gote: [] },
+                        moveHistory: [],
+                        gameOver: false,
+                        pieceOwners: freshPieceOwners,
+                        isAIMode: false,
+                        isOnlineMode: true,
+                        beginnerMode: this.gameState.beginnerMode,
+                        catMode: this.gameState.catMode,
+                        pendingPromotion: null,
+                        inCheck: false
+                    };
+                    
+                    // モーダルを閉じる
+                    this.closeModal();
+                    
+                    // 盤面を再初期化
+                    setTimeout(() => {
+                        this.initBoard();
+                        const sideText = newPlayerSide === 'sente' ? '先手' : '後手';
+                        this.showNotification(`再戦開始！今回あなたは${sideText}です。`, 'info');
+                    }, 100);
+                    
+                }).catch((error) => {
+                    console.error('再戦開始エラー:', error);
+                    this.showNotification('再戦の開始に失敗しました', 'error');
+                });
             },
             
             // ============================================
@@ -2834,6 +3030,21 @@
                 document.getElementById('gameOverTitle').textContent = title;
                 document.getElementById('gameOverMessage').textContent = message;
                 document.getElementById('gameOverModal').classList.add('show');
+                
+                // オンラインモードの場合は再戦セクションを表示
+                if (this.gameState.isOnlineMode && this.onlineState.connected) {
+                    document.getElementById('rematchSection').style.display = 'block';
+                    document.getElementById('newLocalGameBtn').style.display = 'none';
+                    // 再戦状態をリセット
+                    this.onlineState.rematchRequested = false;
+                    this.onlineState.opponentRematchRequested = false;
+                    document.getElementById('rematchBtn').style.display = 'inline-block';
+                    document.getElementById('declineRematchBtn').style.display = 'none';
+                    document.getElementById('rematchStatusText').textContent = '再戦を提案しますか？';
+                } else {
+                    document.getElementById('rematchSection').style.display = 'none';
+                    document.getElementById('newLocalGameBtn').style.display = 'inline-block';
+                }
             },
             
             showNotification(message, type = 'info') {
@@ -2900,7 +3111,9 @@
                     playerSide: null,
                     syncInProgress: false,
                     lastSyncVersion: 0,
-                    boardInitialized: false
+                    boardInitialized: false,
+                    rematchRequested: false,
+                    opponentRematchRequested: false
                 };
                 
                 this.gameState = {
@@ -3064,6 +3277,12 @@
                 document.querySelectorAll('.modal').forEach((modal) => {
                     modal.classList.remove('show');
                 });
+                
+                // 再戦状態をリセット
+                if (this.gameState.isOnlineMode) {
+                    this.onlineState.rematchRequested = false;
+                    this.onlineState.opponentRematchRequested = false;
+                }
             }
         };
         
@@ -3082,7 +3301,9 @@
             leaveRoom: () => ShogiApp.leaveRoom(),
             sendChatMessage: () => ShogiApp.sendChatMessage(),
             toggleView: () => ShogiApp.toggleView(),
-            clearRoomCache: () => ShogiApp.clearRoomCache()
+            clearRoomCache: () => ShogiApp.clearRoomCache(),
+            proposeRematch: () => ShogiApp.proposeRematch(),
+            declineRematch: () => ShogiApp.declineRematch()
         };
         
         // 初期化

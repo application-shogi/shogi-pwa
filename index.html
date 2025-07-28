@@ -1,151 +1,4 @@
-showMoveGuide(row, col, piece) {
-                const shouldReverse = this.shouldRotateBoard();
-                const displayRow = shouldReverse ? (8 - row) : row;
-                const displayCol = shouldReverse ? (8 - col) : col;
-                
-                const cell = document.querySelector(`[data-row="${displayRow}"][data-col="${displayCol}"]`);
-                if (!cell) return;
-                
-                // 既存のガイドを削除
-                const existingGuide = cell.querySelector('.move-guide');
-                if (existingGuide) {
-                    existingGuide.remove();
-                }
-                
-                const guideContainer = document.createElement('div');
-                guideContainer.className = 'move-guide';
-                
-                const owner = this.gameState.pieceOwners[row][col];
-                const pattern = this.CONSTANTS.MOVE_PATTERNS[piece];
-                
-                if (Array.isArray(pattern)) {
-                    // 固定距離の移動パターン
-                    pattern.forEach(move => {
-                        const actualMove = owner === 'sente' ? move : [-move[0], move[1]];
-                        this.addMoveArrow(guideContainer, actualMove[0], actualMove[1], shouldReverse);
-                    });
-                } else {
-                    // 無限距離の移動パターン
-                    switch (pattern) {
-                        case 'cross':
-                            this.addMoveLine(guideContainer, 'horizontal', true);
-                            this.addMoveLine(guideContainer, 'horizontal', false);
-                            this.addMoveLine(guideContainer, 'vertical', true);
-                            this.addMoveLine(guideContainer, 'vertical', false);
-                            break;
-                        case 'diagonal':
-                            this.addMoveLine(guideContainer, 'diagonal', true, true);
-                            this.addMoveLine(guideContainer, 'diagonal', true, false);
-                            this.addMoveLine(guideContainer, 'diagonal', false, true);
-                            this.addMoveLine(guideContainer, 'diagonal', false, false);
-                            break;
-                        case 'line_up':
-                            if (owner === 'sente') {
-                                this.addMoveLine(guideContainer, 'vertical', true);
-                            } else {
-                                this.addMoveLine(guideContainer, 'vertical', false);
-                            }
-                            break;
-                        case 'dragon':
-                            // 龍：十字 + 斜め1マス
-                            this.addMoveLine(guideContainer, 'horizontal', true);
-                            this.addMoveLine(guideContainer, 'horizontal', false);
-                            this.addMoveLine(guideContainer, 'vertical', true);
-                            this.addMoveLine(guideContainer, 'vertical', false);
-                            this.addMoveArrow(guideContainer, -1, -1, shouldReverse);
-                            this.addMoveArrow(guideContainer, -1, 1, shouldReverse);
-                            this.addMoveArrow(guideContainer, 1, -1, shouldReverse);
-                            this.addMoveArrow(guideContainer, 1, 1, shouldReverse);
-                            break;
-                        case 'horse':
-                            // 馬：斜め + 十字1マス
-                            this.addMoveLine(guideContainer, 'diagonal', true, true);
-                            this.addMoveLine(guideContainer, 'diagonal', true, false);
-                            this.addMoveLine(guideContainer, 'diagonal', false, true);
-                            this.addMoveLine(guideContainer, 'diagonal', false, false);
-                            this.addMoveArrow(guideContainer, -1, 0, shouldReverse);
-                            this.addMoveArrow(guideContainer, 1, 0, shouldReverse);
-                            this.addMoveArrow(guideContainer, 0, -1, shouldReverse);
-                            this.addMoveArrow(guideContainer, 0, 1, shouldReverse);
-                            break;
-                    }
-                }
-                
-                cell.appendChild(guideContainer);
-            },
-            
-            addMoveArrow(container, dRow, dCol, shouldReverse) {
-                const arrow = document.createElement('div');
-                arrow.className = 'move-guide-arrow';
-                
-                // 後手視点の場合は方向を反転
-                if (shouldReverse) {
-                    dRow = -dRow;
-                    dCol = -dCol;
-                }
-                
-                // 位置を計算
-                const offsetX = dCol * 30;
-                const offsetY = dRow * 30;
-                
-                arrow.style.left = `calc(50% + ${offsetX}px - 10px)`;
-                arrow.style.top = `calc(50% + ${offsetY}px - 10px)`;
-                
-                // 矢印の向きを設定
-                const angle = Math.atan2(dRow, dCol) * 180 / Math.PI + 90;
-                arrow.style.transform = `rotate(${angle}deg)`;
-                
-                container.appendChild(arrow);
-            },
-            
-            addMoveLine(container, type, positive, diagonal2 = null) {
-                const line = document.createElement('div');
-                line.className = `move-guide-line ${type}`;
-                
-                if (type === 'horizontal') {
-                    line.style.width = positive ? 'calc(50% - 10px)' : 'calc(50% - 10px)';
-                    line.style[positive ? 'left' : 'right'] = '50%';
-                } else if (type === 'vertical') {
-                    line.style.height = positive ? 'calc(50% - 10px)' : 'calc(50% - 10px)';
-                    line.style[positive ? 'top' : 'bottom'] = '50%';
-                } else if (type === 'diagonal') {
-                    const length = 'calc(70.7% - 14px)'; // 45度の対角線
-                    line.style.height = length;
-                    line.style.left = '50%';
-                    line.style.top = '50%';
-                    
-                    let rotation = 0;
-                    if (positive && diagonal2) rotation = -45;
-                    else if (positive && !diagonal2) rotation = 45;
-                    else if (!positive && diagonal2) rotation = -135;
-                    else rotation = 135;
-                    
-                    line.style.transform = `translateX(-50%) rotate(${rotation}deg)`;
-                    line.style.transformOrigin = 'top center';
-                }
-                
-                container.appendChild(line);
-            },            sendGameOverToOpponent() {
-                if (!this.firebase.currentRoomRef || !this.onlineState.connected) return;
-                
-                try {
-                    // ゲーム終了状態を送信
-                    const updates = {
-                        'gameState/gameOver': true,
-                        'gameState/lastUpdated': firebase.database.ServerValue.TIMESTAMP
-                    };
-                    
-                    this.firebase.currentRoomRef.update(updates).catch((error) => {
-                        console.error('ゲーム終了状態の送信エラー:', error);
-                    });
-                } catch (error) {
-                    console.error('ゲーム終了状態の送信エラー:', error);
-                }
-            },
-            
-            // ============================================
-            // UI関連
-            // ============================================<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
@@ -928,9 +781,6 @@ showMoveGuide(row, col, piece) {
     
     <!-- メインゲームコンテナ -->
     <div class="game-container">
-    
-    <!-- メインゲームコンテナ -->
-    <div class="game-container">
         <!-- オンライン対戦セクション -->
         <div class="online-room-section" id="onlineSection" style="display: none;">
             <h3>🌐 オンライン対戦</h3>
@@ -1595,6 +1445,156 @@ showMoveGuide(row, col, piece) {
                 }
                 
                 return pieceElement;
+            },
+            
+            // ============================================
+            // 初心者モード用の駒の動きガイド
+            // ============================================
+            showMoveGuide(row, col, piece) {
+                const shouldReverse = this.shouldRotateBoard();
+                const displayRow = shouldReverse ? (8 - row) : row;
+                const displayCol = shouldReverse ? (8 - col) : col;
+                
+                const cell = document.querySelector(`[data-row="${displayRow}"][data-col="${displayCol}"]`);
+                if (!cell) return;
+                
+                // 既存のガイドを削除
+                const existingGuide = cell.querySelector('.move-guide');
+                if (existingGuide) {
+                    existingGuide.remove();
+                }
+                
+                const guideContainer = document.createElement('div');
+                guideContainer.className = 'move-guide';
+                
+                const owner = this.gameState.pieceOwners[row][col];
+                const pattern = this.CONSTANTS.MOVE_PATTERNS[piece];
+                
+                if (Array.isArray(pattern)) {
+                    // 固定距離の移動パターン
+                    pattern.forEach(move => {
+                        const actualMove = owner === 'sente' ? move : [-move[0], move[1]];
+                        this.addMoveArrow(guideContainer, actualMove[0], actualMove[1], shouldReverse);
+                    });
+                } else {
+                    // 無限距離の移動パターン
+                    switch (pattern) {
+                        case 'cross':
+                            this.addMoveLine(guideContainer, 'horizontal', true);
+                            this.addMoveLine(guideContainer, 'horizontal', false);
+                            this.addMoveLine(guideContainer, 'vertical', true);
+                            this.addMoveLine(guideContainer, 'vertical', false);
+                            break;
+                        case 'diagonal':
+                            this.addMoveLine(guideContainer, 'diagonal', true, true);
+                            this.addMoveLine(guideContainer, 'diagonal', true, false);
+                            this.addMoveLine(guideContainer, 'diagonal', false, true);
+                            this.addMoveLine(guideContainer, 'diagonal', false, false);
+                            break;
+                        case 'line_up':
+                            if (owner === 'sente') {
+                                this.addMoveLine(guideContainer, 'vertical', true);
+                            } else {
+                                this.addMoveLine(guideContainer, 'vertical', false);
+                            }
+                            break;
+                        case 'dragon':
+                            // 龍：十字 + 斜め1マス
+                            this.addMoveLine(guideContainer, 'horizontal', true);
+                            this.addMoveLine(guideContainer, 'horizontal', false);
+                            this.addMoveLine(guideContainer, 'vertical', true);
+                            this.addMoveLine(guideContainer, 'vertical', false);
+                            this.addMoveArrow(guideContainer, -1, -1, shouldReverse);
+                            this.addMoveArrow(guideContainer, -1, 1, shouldReverse);
+                            this.addMoveArrow(guideContainer, 1, -1, shouldReverse);
+                            this.addMoveArrow(guideContainer, 1, 1, shouldReverse);
+                            break;
+                        case 'horse':
+                            // 馬：斜め + 十字1マス
+                            this.addMoveLine(guideContainer, 'diagonal', true, true);
+                            this.addMoveLine(guideContainer, 'diagonal', true, false);
+                            this.addMoveLine(guideContainer, 'diagonal', false, true);
+                            this.addMoveLine(guideContainer, 'diagonal', false, false);
+                            this.addMoveArrow(guideContainer, -1, 0, shouldReverse);
+                            this.addMoveArrow(guideContainer, 1, 0, shouldReverse);
+                            this.addMoveArrow(guideContainer, 0, -1, shouldReverse);
+                            this.addMoveArrow(guideContainer, 0, 1, shouldReverse);
+                            break;
+                    }
+                }
+                
+                cell.appendChild(guideContainer);
+            },
+            
+            addMoveArrow(container, dRow, dCol, shouldReverse) {
+                const arrow = document.createElement('div');
+                arrow.className = 'move-guide-arrow';
+                
+                // 後手視点の場合は方向を反転
+                if (shouldReverse) {
+                    dRow = -dRow;
+                    dCol = -dCol;
+                }
+                
+                // 位置を計算
+                const offsetX = dCol * 30;
+                const offsetY = dRow * 30;
+                
+                arrow.style.left = `calc(50% + ${offsetX}px - 10px)`;
+                arrow.style.top = `calc(50% + ${offsetY}px - 10px)`;
+                
+                // 矢印の向きを設定
+                const angle = Math.atan2(dRow, dCol) * 180 / Math.PI + 90;
+                arrow.style.transform = `rotate(${angle}deg)`;
+                
+                container.appendChild(arrow);
+            },
+            
+            addMoveLine(container, type, positive, diagonal2 = null) {
+                const line = document.createElement('div');
+                line.className = `move-guide-line ${type}`;
+                
+                if (type === 'horizontal') {
+                    line.style.width = positive ? 'calc(50% - 10px)' : 'calc(50% - 10px)';
+                    line.style[positive ? 'left' : 'right'] = '50%';
+                } else if (type === 'vertical') {
+                    line.style.height = positive ? 'calc(50% - 10px)' : 'calc(50% - 10px)';
+                    line.style[positive ? 'top' : 'bottom'] = '50%';
+                } else if (type === 'diagonal') {
+                    const length = 'calc(70.7% - 14px)'; // 45度の対角線
+                    line.style.height = length;
+                    line.style.left = '50%';
+                    line.style.top = '50%';
+                    
+                    let rotation = 0;
+                    if (positive && diagonal2) rotation = -45;
+                    else if (positive && !diagonal2) rotation = 45;
+                    else if (!positive && diagonal2) rotation = -135;
+                    else rotation = 135;
+                    
+                    line.style.transform = `translateX(-50%) rotate(${rotation}deg)`;
+                    line.style.transformOrigin = 'top center';
+                }
+                
+                container.appendChild(line);
+            },
+            
+            sendGameOverToOpponent() {
+                if (!this.firebase.currentRoomRef || !this.onlineState.connected) return;
+                
+                try {
+                    // ゲーム終了状態を送信
+                    const updates = {
+                        'gameState/gameOver': true,
+                        'gameState/lastUpdated': firebase.database.ServerValue.TIMESTAMP
+                    };
+                    
+                    this.firebase.currentRoomRef.update(updates).catch((error) => {
+                        console.error('ゲーム終了状態の送信エラー:', error);
+                    });
+                } catch (error) {
+                    console.error('ゲーム終了状態の送信エラー:', error);
+                }
             },
             
             // ============================================

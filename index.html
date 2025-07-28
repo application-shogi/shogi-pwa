@@ -1579,17 +1579,21 @@
                 container.appendChild(line);
             },
             
-            sendGameOverToOpponent() {
+            sendGameOverToOpponent(winnerSide) {
                 if (!this.firebase.currentRoomRef || !this.onlineState.connected) return;
                 
                 try {
-                    // ゲーム終了状態を送信
+                    // ゲーム終了状態と勝者情報を送信
                     const updates = {
                         'gameState/gameOver': true,
-                        'gameState/lastUpdated': firebase.database.ServerValue.TIMESTAMP
+                        'gameState/winner': winnerSide, // 勝者の手番を追加
+                        'gameState/lastUpdated': firebase.database.ServerValue.TIMESTAMP,
+                        'gameState/version': this.onlineState.lastSyncVersion + 1
                     };
                     
-                    this.firebase.currentRoomRef.update(updates).catch((error) => {
+                    this.firebase.currentRoomRef.update(updates).then(() => {
+                        this.onlineState.lastSyncVersion += 1;
+                    }).catch((error) => {
                         console.error('ゲーム終了状態の送信エラー:', error);
                     });
                 } catch (error) {
@@ -2044,12 +2048,25 @@
                 if (this.isInCheck(opponent)) {
                     if (this.isCheckmate(opponent)) {
                         const winner = opponent === 'sente' ? '後手' : '先手';
-                        this.showGameOver(`${winner}の勝ち！`, '詰みです！');
+                        const winnerSide = opponent === 'sente' ? 'gote' : 'sente';
                         this.gameState.gameOver = true;
                         
-                        // オンラインモードの場合、ゲーム終了状態を同期
+                        // オンラインモードの場合、勝者情報を含めて同期
                         if (this.gameState.isOnlineMode && this.onlineState.connected) {
-                            this.sendGameOverToOpponent();
+                            this.sendGameOverToOpponent(winnerSide);
+                        }
+                        
+                        // ローカルでのゲーム終了表示
+                        if (this.gameState.isOnlineMode && this.onlineState.connected) {
+                            // オンラインモードでは自分が勝者か敗者かで表示を変える
+                            if (this.onlineState.playerSide === winnerSide) {
+                                this.showGameOver(`${winner}の勝ち！`, 'あなたの勝ちです！');
+                            } else {
+                                this.showGameOver(`${winner}の勝ち！`, 'あなたの負けです。');
+                            }
+                        } else {
+                            // ローカルモードの場合
+                            this.showGameOver(`${winner}の勝ち！`, '詰みです！');
                         }
                     } else {
                         this.showNotification('王手！', 'warning');
